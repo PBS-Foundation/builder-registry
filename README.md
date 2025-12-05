@@ -1,4 +1,7 @@
-# Builder Registry — On-Chain Curated List of Ethereum Builders
+# Builder Registry — On-Chain Curated List of Ethereum Builders for ePBS [EIP-7732](https://eips.ethereum.org/EIPS/eip-7732)
+
+> **⚠️ Status: In Development**  
+> This contract is currently under active development. The implementation may change before production deployment.
 
 ## Overview
 
@@ -21,7 +24,7 @@ Ownership follows a multisig-safe model: the contract has a single `owner`, expe
 
 ## Motivation
 
-Under ePBS, proposers will be able to choose which builders they accept trustless payments from. A curated list helps them query for builders that comply with their specific requirements.
+Under ePBS, proposers will be able to choose which builders they accept bids from. A curated list helps them query for builders that comply with their specific requirements.
 
 The Builder Registry provides:
 
@@ -59,10 +62,10 @@ Each curator can publish metadata for builders:
 
 Curator functions:
 
-- `setBuilder(address builder, BuilderInfoInput info)`  
+- `setBuilder(address builder, BuilderInfo info)`  
 - `removeBuilder(address builder)`
 
-Builder removal uses soft delete: flags are cleared but the address stays in the internal list for gas efficiency.
+Builder are completely removed from both the mapping and the list.
 
 ---
 
@@ -81,7 +84,6 @@ struct Curator {
 
 ```solidity
 struct BuilderInfo {
-    bool exists;
     bool active;
     bool recommended;
     bool trustedPayment;
@@ -90,13 +92,13 @@ struct BuilderInfo {
     bool blobSupport;
 }
 ```
-
 ---
 
 ## Events
 
 - `OwnerChanged(address oldOwner, address newOwner)`  
 - `CuratorRegistered(address curator, string metadataURI)`  
+- `CuratorUpdated(address curator, string metadataURI)`  
 - `CuratorUnregistered(address curator)`  
 - `BuilderSet(address curator, address builder, ...)`  
 - `BuilderRemoved(address curator, address builder)`  
@@ -110,50 +112,102 @@ These events make the registry indexable and observable off-chain.
 Read-only functions that proposer clients can call:
 
 - `getAllBuilders(address curator)`  
-  - All builders where `exists == true` for that curator.
+  - Returns all registered builders for the given curator.
 
-- `getActiveBuilders(address curator)`  
-  - Builders where `exists == true` and `active == true`.
+- `isBuilderRegistered(address curator, address builder)`  
+  - Returns `true` if the builder is registered for the given curator.
 
-- `getRecommendedBuilders(address curator)`  
-  - Builders where `exists == true`, `active == true`, and `recommended == true`.
-
-- `getBlobBuilders(address curator)`  
-  - Builders where `exists == true`, `active == true`, and `blobSupport == true`.
-
-- `getBuildersByFilter(address curator, bool onlyTrustedPayment, bool onlyTrustlessPayment, bool onlyOFAC)`  
-  - Builders that exist, are active, and satisfy the filter flags.
+- `getBuildersByFilter(address curator, BuilderInfo filter, uint8 filterMask)`  
+  - Returns builders matching the specified filter criteria using a bitmask system.
+  - **Filter Mask Bits:**
+    - Bit 0 (0x01): `active`
+    - Bit 1 (0x02): `recommended`
+    - Bit 2 (0x04): `trustedPayment`
+    - Bit 3 (0x08): `trustlessPayment`
+    - Bit 4 (0x10): `ofacCompliant`
+    - Bit 5 (0x20): `blobSupport`
+  - Only fields where the corresponding bit is set in `filterMask` are checked.
+  - The `filter` parameter specifies the exact values to match against.
 
 - `buildersByCurator(address curator, address builder)`  
   - Returns the full `BuilderInfo` struct for a `(curator, builder)` pair.
 
-Each curator has an independent namespace; one curator’s data does not affect another’s.
+Each curator has an independent namespace; one curator's data does not affect another's.
 
 ---
 
 ## Usage Examples
 
+### Get all builders
+
+```solidity
+address[] memory all = registry.getAllBuilders(curator);
+```
+
+### Check if a builder is registered
+
+```solidity
+bool registered = registry.isBuilderRegistered(curator, builder);
+```
+
+### Get active builders
+
+```solidity
+BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
+    active: true,
+    recommended: false,
+    trustedPayment: false,
+    trustlessPayment: false,
+    ofacCompliant: false,
+    blobSupport: false
+});
+uint8 filterMask = 0x01; // bit 0 = active
+address[] memory active = registry.getBuildersByFilter(curator, filter, filterMask);
+```
+
 ### Get recommended builders
 
 ```solidity
-address[] memory rec = registry.getRecommendedBuilders(curator);
+BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
+    active: true,
+    recommended: true,
+    trustedPayment: false,
+    trustlessPayment: false,
+    ofacCompliant: false,
+    blobSupport: false
+});
+uint8 filterMask = 0x03; // bit 0 = active, bit 1 = recommended
+address[] memory rec = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
 ### Get blob-supporting builders
 
 ```solidity
-address[] memory blobBuilders = registry.getBlobBuilders(curator);
+BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
+    active: true,
+    recommended: false,
+    trustedPayment: false,
+    trustlessPayment: false,
+    ofacCompliant: false,
+    blobSupport: true
+});
+uint8 filterMask = 0x21; // bit 0 = active, bit 5 = blobSupport
+address[] memory blobBuilders = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
-### Filter builders (trusted + OFAC-compliant)
+### Filter builders (trusted payment + OFAC-compliant)
 
 ```solidity
-address[] memory filtered = registry.getBuildersByFilter(
-    curator,
-    true,   // onlyTrustedPayment
-    false,  // onlyTrustlessPayment
-    true    // onlyOFAC
-);
+BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
+    active: true,
+    recommended: false,
+    trustedPayment: true,
+    trustlessPayment: false,
+    ofacCompliant: true,
+    blobSupport: false
+});
+uint8 filterMask = 0x15; // bit 0 = active, bit 2 = trustedPayment, bit 4 = ofacCompliant
+address[] memory filtered = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
 ---
@@ -170,14 +224,6 @@ address[] memory filtered = registry.getBuildersByFilter(
 
 Curators have write access only within their own builder namespace.
 
-Builders are removed via soft delete: `exists` and all flags are set to `false`, but the address remains in the array to avoid O(n) gas costs and griefing.
-
-Example: transfer ownership to a Safe:
-
-```solidity
-registry.setOwner(SAFE_ADDRESS);
-```
-
 ---
 
 ## Developer Setup
@@ -193,33 +239,3 @@ forge install
 ```bash
 forge test -vv
 ```
-
-The test suite covers:
-
-- owner permission checks  
-- curator registration, metadata update, and removal  
-- builder insertion, flag updates, and removal  
-- `getAllBuilders`, `getActiveBuilders`, `getRecommendedBuilders`  
-- `getBlobBuilders` and `blobSupport`  
-- `getBuildersByFilter`  
-- namespace isolation between curators  
-- soft-delete behavior  
-
----
-
-## Deployment Workflow
-
-1. Deploy the contract from an EOA.  
-2. Create or choose a Gnosis Safe multisig.  
-3. Transfer ownership of the registry to the Safe:
-
-   ```solidity
-   registry.setOwner(SAFE_ADDRESS);
-   ```
-
-4. From the Safe, call `registerCurator` to add trusted curators.  
-5. Curators call `setBuilder` / `removeBuilder` to maintain their builder lists.  
-6. Proposer clients read from the registry and follow curated sets automatically.
-
----
-
