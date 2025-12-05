@@ -106,7 +106,7 @@ contract BuilderRegistry {
         bool trustedPayment;
         bool trustlessPayment;
         bool ofacCompliant;
-        bool blobSupport; 
+        bool blobSupport;
     }
 
     function setBuilder(address builder, BuilderInfoInput calldata info) external onlyCurator {
@@ -136,7 +136,6 @@ contract BuilderRegistry {
             info.trustlessPayment,
             info.ofacCompliant,
             info.blobSupport
-            
         );
     }
 
@@ -205,7 +204,6 @@ contract BuilderRegistry {
         return result;
     }
 
-    
     function getBlobBuilders(address curator) external view returns (address[] memory) {
         address[] storage list = builderListByCurator[curator];
         uint256 len = list.length;
@@ -228,8 +226,7 @@ contract BuilderRegistry {
         }
 
         return result;
-        }
-
+    }
 
     function getRecommendedBuilders(address curator) external view returns (address[] memory) {
         address[] storage list = builderListByCurator[curator];
@@ -254,12 +251,11 @@ contract BuilderRegistry {
         return result;
     }
 
-    function getBuildersByFilter(
-        address curator,
-        bool onlyTrustedPayment,
-        bool onlyTrustlessPayment,
-        bool onlyOFAC
-    ) external view returns (address[] memory) {
+    function getBuildersByFilter(address curator, bool onlyTrustedPayment, bool onlyTrustlessPayment, bool onlyOFAC)
+        external
+        view
+        returns (address[] memory)
+    {
         address[] storage list = builderListByCurator[curator];
         uint256 len = list.length;
 
