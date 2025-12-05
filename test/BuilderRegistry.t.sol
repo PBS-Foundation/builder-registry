@@ -70,8 +70,8 @@ contract BuilderRegistryTest is Test {
         bool trustlessPayment,
         bool ofacCompliant,
         bool blobSupport
-    ) internal pure returns (BuilderRegistry.BuilderInfoInput memory) {
-        return BuilderRegistry.BuilderInfoInput({
+    ) internal pure returns (BuilderRegistry.BuilderInfo memory) {
+        return BuilderRegistry.BuilderInfo({
             active: active,
             recommended: recommended,
             trustedPayment: trustedPayment,
@@ -97,7 +97,6 @@ contract BuilderRegistryTest is Test {
         );
 
         (
-            bool exists,
             bool active,
             bool recommended,
             bool trustedPayment,
@@ -106,7 +105,7 @@ contract BuilderRegistryTest is Test {
             bool blobSupport
         ) = registry.buildersByCurator(curator1, builder1);
 
-        assertTrue(exists);
+        assertTrue(registry.isBuilderRegistered(curator1, builder1));
         assertTrue(active);
         assertTrue(recommended);
         assertTrue(trustedPayment);
@@ -130,7 +129,6 @@ contract BuilderRegistryTest is Test {
         vm.stopPrank();
 
         (
-            bool exists,
             bool active,
             bool recommended,
             bool trustedPayment,
@@ -139,7 +137,7 @@ contract BuilderRegistryTest is Test {
             bool blobSupport
         ) = registry.buildersByCurator(curator1, builder1);
 
-        assertTrue(exists);
+        assertTrue(registry.isBuilderRegistered(curator1, builder1));
         assertTrue(active);
         assertFalse(recommended);
         assertFalse(trustedPayment);
@@ -154,23 +152,12 @@ contract BuilderRegistryTest is Test {
         registry.removeBuilder(builder1);
         vm.stopPrank();
 
-        (
-            bool exists,
-            bool active,
-            bool recommended,
-            bool trustedPayment,
-            bool trustlessPayment,
-            bool ofacCompliant,
-            bool blobSupport
-        ) = registry.buildersByCurator(curator1, builder1);
+        // Builder should be completely removed (swap-and-pop)
+        assertFalse(registry.isBuilderRegistered(curator1, builder1));
 
-        assertFalse(exists);
-        assertFalse(active);
-        assertFalse(recommended);
-        assertFalse(trustedPayment);
-        assertFalse(trustlessPayment);
-        assertFalse(ofacCompliant);
-        assertFalse(blobSupport);
+        // Builder should not be in the list
+        address[] memory all = registry.getAllBuilders(curator1);
+        assertEq(all.length, 0);
     }
 
     function testNonCuratorCannotRemoveBuilder() public {
@@ -210,7 +197,10 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(builder3, _defaultBuilderInput(true, false, false, true, false, true));
         vm.stopPrank();
 
-        address[] memory active = registry.getActiveBuilders(curator1);
+        // Use getBuildersByFilter with active=true filter
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, false, false, false, false);
+        uint8 filterMask = 0x01; // bit 0 = active
+        address[] memory active = registry.getBuildersByFilter(curator1, filter, filterMask);
         assertEq(active.length, 2);
 
         // Should contain builder1 and builder3 (order preserved)
@@ -228,7 +218,10 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(builder3, _defaultBuilderInput(true, false, false, true, false, true));
         vm.stopPrank();
 
-        address[] memory rec = registry.getRecommendedBuilders(curator1);
+        // Use getBuildersByFilter with active=true and recommended=true
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, true, false, false, false, false);
+        uint8 filterMask = 0x03; // bit 0 = active, bit 1 = recommended
+        address[] memory rec = registry.getBuildersByFilter(curator1, filter, filterMask);
         assertEq(rec.length, 1);
         assertEq(rec[0], builder1);
     }
@@ -243,12 +236,10 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(builder3, _defaultBuilderInput(false, true, true, false, true, true));
         vm.stopPrank();
 
-        address[] memory trustedOnly = registry.getBuildersByFilter(
-            curator1,
-            true, // onlyTrustedPayment
-            false, // onlyTrustlessPayment
-            false // onlyOFAC
-        );
+        // Use getBuildersByFilter with active=true and trustedPayment=true
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, true, false, false, false);
+        uint8 filterMask = 0x05; // bit 0 = active, bit 2 = trustedPayment
+        address[] memory trustedOnly = registry.getBuildersByFilter(curator1, filter, filterMask);
 
         // only builder1 (active + trustedPayment)
         assertEq(trustedOnly.length, 1);
@@ -265,12 +256,10 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(builder3, _defaultBuilderInput(false, true, false, true, true, true));
         vm.stopPrank();
 
-        address[] memory result = registry.getBuildersByFilter(
-            curator1,
-            false, // onlyTrustedPayment
-            true, // onlyTrustlessPayment
-            true // onlyOFAC
-        );
+        // Use getBuildersByFilter with active=true, trustlessPayment=true, and ofacCompliant=true
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, false, true, true, false);
+        uint8 filterMask = 0x19; // bit 0 = active, bit 3 = trustlessPayment, bit 4 = ofacCompliant
+        address[] memory result = registry.getBuildersByFilter(curator1, filter, filterMask);
 
         // only builder1 matches all three conditions
         assertEq(result.length, 1);
@@ -306,8 +295,10 @@ contract BuilderRegistryTest is Test {
         registry.removeBuilder(builder1);
 
         address[] memory all = registry.getAllBuilders(curator1);
-        // internal array still len=2, but exists==true only for builder2
+        // Builder is completely removed using swap-and-pop
         assertEq(all.length, 1);
         assertEq(all[0], builder2);
+        assertFalse(registry.isBuilderRegistered(curator1, builder1));
+        assertTrue(registry.isBuilderRegistered(curator1, builder2));
     }
 }
