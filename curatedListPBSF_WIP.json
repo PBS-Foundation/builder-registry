@@ -1,0 +1,150 @@
+{
+    "version": 1,
+    "network": "ethereum-mainnet",
+    "description": "Curated builder list for use with BuilderRegistry / proposer clients.",
+    "builders": [
+      {
+        "name": "Titan",
+        "address": "0x4838B106FCe9647Bdf1E7877BF73cE8B0BAD5f97",
+        "knownPubKey": [
+          "0x94a076b27f294dc44b9fd44d8e2b063fb129bc85ed047da1cefb82d16e1a13e6b50de31a86f5b233d1e6bbaca3c69173",
+          "0xabf1ad5ec0512cb1adabe457882fa550b4935f1f7df9658e46af882049ec16da698c323af8c98c3f1f9570ebc4042a83",
+          "0xb67eaa5efcfa1d17319c344e1e5167811afbfe7922a2cf01c9a361f465597a5dc3a5472bd98843bac88d2541a78eab08",
+          "0xb26f96664274e15fb6fcda862302e47de7e0e2a6687f8349327a9846043e42596ec44af676126e2cacbdd181f548e681",
+          "0x95c8cc31f8d4e54eddb0603b8f12d59d466f656f374bde2073e321bdd16082d420e3eef4d62467a7ea6b83818381f742",
+          "0x8509ecb595da0eda2c6fced4e287f0510a2c2dba5f80ee930503ef86e268d808a6df25e397177da06cd479771ce66840",
+          "0xa32aadb23e45595fe4981114a8230128443fd5407d557dc0c158ab93bc2b88939b5a87a84b6863b0d04a4b5a2447f847",
+          "0xae2ffc6986c9a368c5ad2d51f86db2031d780f6ac9b2348044dea4e3a75808b566c935099de8b1a1609db322f2110e7a",
+          "0xb4a435cf816291596fe2e405651ec8b6c80b9cc34dace3c83202ca489a833756c9a0672ebdc17f23d9d43163db1caa5d",
+          "0xb47963246adef02cd3e61cbb648c04fd99b05e28a616aef3aa7fb688c17b10d1ce9662b61a600efbdd110e93d62d5144",
+          "0xaf10542267816e91adbc8f4a6754765d492534f8325f34a2e89caa2ba45c7158f6deaa6e7fb454ebb6f6a1495fe63dba",
+          "0x94829e6f7a598a2f2dfdd9e1246d7cfdc30a626666d9419f3c147cc954507e97184c598dc109f4d05c2139c48af6746c",
+          "0x8226fb149bfe7b4967ffe82ecb9084ffd5bbf0303de0b88f68fdd8297cdffe80f611fa27bc05506b4fba12e2eb5bc5a5",
+          "0xa94a5107948363d29e6a7c476f7e2665eaa27d3d92dcba4c68a66de71c07d1286e2755af80150a3f01e39c1fe69c4ac4",
+          "0x8216e00e1dc8e15c362ce8083ad01feeb04688dd3a18998a37db1c3c8b641372398c504e1aca2cbddd87c4075482b42f"
+        ]
+      },
+      {
+        "name": "Buildernet",
+        "address": "0xdadB0d80178819F2319190D340ce9A924f783711",
+        "variants": [
+          {
+            "label": "Flashbots (regular)",
+            "knownPubKey": [
+              "0x850a00ffd1319a04114cff3793f8403ccbf026e0cf67ddca2f9fbb1a03e056a916becc686cdfe7714b111e35c92a74cf",
+              "0x853a00a74af90ee4ef4f7f41adafa010327e615036000b29711c65877a0eb77665c840b4869bd6208fc03486c097b9c4"
+            ]
+          },
+          {
+            "label": "Flashbots (optimistic)",
+            "knownPubKey": [
+              "0x850b00e055388c1b56f137e0852bc02d8b05534e9f96dd1d11cff8cf0481b800ecc2e708cdc158cd95b7cfdaa6840ee7",
+              "0x853b0078c722ade5dd089dd9ce2eea3890dcc825213231600b3023ab92aa3e835c5325f31515b82a9a0559c881a14cde"
+            ]
+          },
+          {
+            "label": "Nethermind (regular)",
+            "knownPubKey": [
+              "0x851a009553c46cae9384ebc59dcf17064ee8839de085910ec71d834ab1b8dc7a1f3271008c2438ae3b3e44be994108a6",
+              "0x856a005086a7885e932e3d51feb86cf33a0d34bdc61e517b6b5742246567899b892ee2a1d58362983d63bb36ac7b9a28"
+            ]
+          },
+          {
+            "label": "Nethermind (optimistic)",
+            "knownPubKey": [
+              "0x851b00b12f73770337fbd219b439aba7bd8e770dbdea16a3b0df030d971bc0d824d470d7868e5d93355f501bfe892947",
+              "0x856b00042301181ccf5277309c6f44595e343a284187bfe9868d6812e46fba21831fecbe8b0e6814c1463ba540ac3f46"
+            ]
+          },
+          {
+            "label": "Beaverbuild (regular)",
+            "knownPubKey": [
+              "0x852a00817dd13ce36535855192e218ccad6d489f90605c501fd4294940550592426552006ebd44f0e661b73d58a9765c",
+              "0x855a0059904005096586fe3b8ae5faa1a630947c5ff517b788100121db18a8961ee40b2ff47139b5b0965a5a0d8fe1af"
+            ]
+          },
+          {
+            "label": "Beaverbuild (optimistic)",
+            "knownPubKey": [
+              "0x852b0070e2522fcb06dcb159fabcdc7a4b5e1221cc2a56b083577cce03e50afe1b699c5a1111eb3bb1b8684aa90a8333",
+              "0x855b00e6b2c5dd524d2689bd43e0a965262810cbd7a2c71166f53594fb01bba8151bdd6a09ddb0408f7063b17eb3742e"
+            ]
+          }
+        ]
+      },
+      {
+        "name": "BeaverBuild",
+        "address": "0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5",
+        "knownPubKey": []
+      },
+      {
+        "name": "Rsync",
+        "address": "0x1f9090aae28b8a3dceadf281b0f12828e676c326",
+        "knownPubKey": [
+          "0xa00001792da52b2ad6606033396337f86e7598c8e0927d640bb649e0a9fe230df41f8ffd3403a5cd4fffd5131e2fbe47",
+          "0xa00002326e62d66f690e457595023fa44699e4237fc4cc36eed5e4937f19398fc1452be33d2b2f553693e9eda2d26618",
+          "0xa00003f73b2dd7971dd3030d6af2ba42bdf9cd02197026fee7572f3b8147137cca109048cece90fdd0f73a5d9b5b5e41",
+          "0xa00004426b99f107744b01886daec9f949205dae33a2072b5981008e94ef930e8a8291d7594554f1d2ae707e5312fc15",
+          "0xa00005bedf6288f76e07d7d92a5f1324ed59b01320155587985f92a3a4e7e819550e94bc9128d1f34bf2c4e6e28e4899",
+          "0xa000065d284980c18edd777bd6241e0c140abe1ae913c54ccc29721ba75b87dd882bc55a28d14dada1d68cd49a9b3940",
+          "0xa0000713760db6cea6cf0ef63c99b5dc5966d9b53750ad3523e0e67f01791e1d72c4d4c271677f99e68134ed57bbfb91",
+          "0xa00008155a5f36172fa044b7317fd77c0c20bddf9a0a08e99ed0293cab4d52c22173b2818bd502a6f3585d65f90a2e40",
+          "0xa0000945e58042cbf8107c6887a466f3eaf843b86639413c974014c2b5559a8bbcbe856d15d4e7f7651baf23a7c885d6"
+        ]
+      },
+      {
+        "name": "Quansar",
+        "address": "0x396343362be2A4dA1cE0C1C210945346fb82Aa49",
+        "knownPubKey": [
+          "0x8db2a99d06eb076ab83049c2dfed5725ed5cf35772071f43365399ad32e505f0e3ff1e14b9686cd74562dc50c282be26",
+          "0x82c466b9b409277c24a6cd0973069fce0f1f7ef3c8d250f6503da5a22830b5c436e47ce0dc20e902b009875809328c49",
+          "0x88510a78794b69e07f73b2f3ee309f78fc372dcb2ed85d5f80bbe7ebc579778f2a7d6aafbb8b00c00cb7241e1c800d65",
+          "0x823e0146b1a5bfc5d4391f7f4391b4f170693369a2350c676238fb1bef4b2dc99bb99307f77e084920cdc7721c80b8df",
+          "0x91b123d8d788268e82a6b9bcc168061bf6f2b25e669feadb8c55b30c718473273e4e6f428c8b9e84074ea587a95ebce6",
+          "0xac23f8cca1198d05204b5de1931268b55dd647419fa1a8814d807adc58d86d464d8bae94c4c7b7793a716cfe2045ff04"
+        ]
+      },
+      {
+        "name": "BTCS",
+        "address": "0x400b6e5929a0656f91b41c19166013bc784b8485",
+        "knownPubKey": [
+          "0x8042acb1f21ff5ee9d0035c2ea5d9a09c3810b048ba28f89e9a94e8e76c5fdd5bebce9b88af4e489ccd1daf735b829bb",
+          "0xa3ad1da9373ae97c21274629668d5b585addc0dfd1b323f0651159df409603f7b0c1fa90237164f817301b6a5733a220",
+          "0xb9810c6839e91b063f8d2dc7acddc60599341600351d7f09d195cbc148307d31b667b52ccfb6559c61a0bdbc06ecdf86",
+          "0xb7c52ab445df2be2b6910f7710de2c236a77130b44a69486abfd89e8fcadc3fd6e545fa02329dc9c30a2c23b727ddab9",
+          "0xb7c5beefbaea0b050764617a764d571929a8a250e9e1226a3c31c738d05ea1fc8b3f2d455e15d623f6a64d52e4f84761"
+        ]
+      },
+      {
+        "name": "BOB THE BUILDER",
+        "address": "0xd87f3d6c5624e8b02be13c2c92f8511b88b94d96",
+        "knownPubKey": []
+      },
+      {
+        "name": "iobuilder",
+        "address": "0x0000000000675d852c8638df2f227949052b1208",
+        "knownPubKey": []
+      },
+      {
+        "name": "Eureka",
+        "address": "0xe0206EDa572D43BF532F8dDd2e6A6235E9690Ee4",
+        "knownPubKey": []
+      },
+      {
+        "name": "Builder+",
+        "address": null,
+        "knownPubKey": [],
+        "urls": [
+          "https://btcs.com",
+          "https://ethgas.com"
+        ],
+        "notes": "Same as BTCS, they just change extradata"
+      },
+      {
+        "name": "Boba Builder",
+        "address": "0x3b64216AD1a58f61538b4fA1B27327675Ab7ED67",
+        "knownPubKey": []
+      }
+    ]
+  }
+  
