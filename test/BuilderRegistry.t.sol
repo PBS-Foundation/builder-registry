@@ -63,12 +63,11 @@ contract BuilderRegistryTest is Test {
 
     // --- Builder operations ---
 
-    function _defaultBuilderInput(
-        bool recommended,
-        bool trustedPayment,
-        bool trustlessPayment,
-        bool ofacCompliant
-    ) internal pure returns (BuilderRegistry.BuilderInfo memory) {
+    function _defaultBuilderInput(bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant)
+        internal
+        pure
+        returns (BuilderRegistry.BuilderInfo memory)
+    {
         return BuilderRegistry.BuilderInfo({
             recommended: recommended,
             trustedPayment: trustedPayment,
@@ -90,12 +89,8 @@ contract BuilderRegistryTest is Test {
             )
         );
 
-        (
-            bool recommended,
-            bool trustedPayment,
-            bool trustlessPayment,
-            bool ofacCompliant
-        ) = registry.buildersByCurator(curator1, builder1);
+        (bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant) =
+            registry.buildersByCurator(curator1, builder1);
 
         assertTrue(registry.isBuilderRegistered(curator1, builder1));
         assertTrue(recommended);
@@ -118,12 +113,8 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(builder1, _defaultBuilderInput(false, false, true, true));
         vm.stopPrank();
 
-        (
-            bool recommended,
-            bool trustedPayment,
-            bool trustlessPayment,
-            bool ofacCompliant
-        ) = registry.buildersByCurator(curator1, builder1);
+        (bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant) =
+            registry.buildersByCurator(curator1, builder1);
 
         assertTrue(registry.isBuilderRegistered(curator1, builder1));
         assertFalse(recommended);

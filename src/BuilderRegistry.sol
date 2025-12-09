@@ -183,12 +183,7 @@ contract BuilderRegistry {
         stored.ofacCompliant = info.ofacCompliant;
 
         emit BuilderSet(
-            msg.sender,
-            builder,
-            info.recommended,
-            info.trustedPayment,
-            info.trustlessPayment,
-            info.ofacCompliant
+            msg.sender, builder, info.recommended, info.trustedPayment, info.trustlessPayment, info.ofacCompliant
         );
     }
 

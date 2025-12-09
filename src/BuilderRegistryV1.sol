@@ -49,11 +49,7 @@ contract BuilderRegistryV1 {
      * @param ofacCompliant Whether the builder is OFAC compliant
      */
     event BuilderSet(
-        address indexed builder,
-        bool recommended,
-        bool trustedPayment,
-        bool trustlessPayment,
-        bool ofacCompliant
+        address indexed builder, bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant
     );
 
     /**
@@ -105,13 +101,7 @@ contract BuilderRegistryV1 {
         stored.trustlessPayment = info.trustlessPayment;
         stored.ofacCompliant = info.ofacCompliant;
 
-        emit BuilderSet(
-            builder,
-            info.recommended,
-            info.trustedPayment,
-            info.trustlessPayment,
-            info.ofacCompliant
-        );
+        emit BuilderSet(builder, info.recommended, info.trustedPayment, info.trustlessPayment, info.ofacCompliant);
     }
 
     /**
