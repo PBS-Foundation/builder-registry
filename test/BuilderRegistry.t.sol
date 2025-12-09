@@ -63,21 +63,16 @@ contract BuilderRegistryTest is Test {
 
     // --- Builder operations ---
 
-    function _defaultBuilderInput(
-        bool active,
-        bool recommended,
-        bool trustedPayment,
-        bool trustlessPayment,
-        bool ofacCompliant,
-        bool blobSupport
-    ) internal pure returns (BuilderRegistry.BuilderInfo memory) {
+    function _defaultBuilderInput(bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant)
+        internal
+        pure
+        returns (BuilderRegistry.BuilderInfo memory)
+    {
         return BuilderRegistry.BuilderInfo({
-            active: active,
             recommended: recommended,
             trustedPayment: trustedPayment,
             trustlessPayment: trustlessPayment,
-            ofacCompliant: ofacCompliant,
-            blobSupport: blobSupport
+            ofacCompliant: ofacCompliant
         });
     }
 
@@ -87,68 +82,50 @@ contract BuilderRegistryTest is Test {
         registry.setBuilder(
             builder1,
             _defaultBuilderInput(
-                true, // active
                 true, // recommended
                 true, // trustedPayment
                 false, // trustlessPayment
-                true, // ofacCompliant
-                true // blobSupport
+                true // ofacCompliant
             )
         );
 
-        (
-            bool active,
-            bool recommended,
-            bool trustedPayment,
-            bool trustlessPayment,
-            bool ofacCompliant,
-            bool blobSupport
-        ) = registry.buildersByCurator(curator1, builder1);
+        (bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant) =
+            registry.buildersByCurator(curator1, builder1);
 
         assertTrue(registry.isBuilderRegistered(curator1, builder1));
-        assertTrue(active);
         assertTrue(recommended);
         assertTrue(trustedPayment);
         assertFalse(trustlessPayment);
         assertTrue(ofacCompliant);
-        assertTrue(blobSupport);
     }
 
     function testNonCuratorCannotSetBuilder() public {
         vm.expectRevert("not curator");
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false));
     }
 
     function testCuratorCanUpdateBuilderFlags() public {
         // initial
         vm.startPrank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, false, false));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, false));
 
-        // update: not recommended, now trustless & OFAC & blobSupport
-        registry.setBuilder(builder1, _defaultBuilderInput(true, false, false, true, true, true));
+        // update: not recommended, now trustless & OFAC
+        registry.setBuilder(builder1, _defaultBuilderInput(false, false, true, true));
         vm.stopPrank();
 
-        (
-            bool active,
-            bool recommended,
-            bool trustedPayment,
-            bool trustlessPayment,
-            bool ofacCompliant,
-            bool blobSupport
-        ) = registry.buildersByCurator(curator1, builder1);
+        (bool recommended, bool trustedPayment, bool trustlessPayment, bool ofacCompliant) =
+            registry.buildersByCurator(curator1, builder1);
 
         assertTrue(registry.isBuilderRegistered(curator1, builder1));
-        assertTrue(active);
         assertFalse(recommended);
         assertFalse(trustedPayment);
         assertTrue(trustlessPayment);
         assertTrue(ofacCompliant);
-        assertTrue(blobSupport);
     }
 
     function testCuratorCanRemoveBuilder() public {
         vm.startPrank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
         registry.removeBuilder(builder1);
         vm.stopPrank();
 
@@ -162,7 +139,7 @@ contract BuilderRegistryTest is Test {
 
     function testNonCuratorCannotRemoveBuilder() public {
         vm.prank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
 
         vm.prank(address(0xBAD));
         vm.expectRevert("not curator");
@@ -173,13 +150,13 @@ contract BuilderRegistryTest is Test {
 
     function testGetAllBuilders() public {
         vm.startPrank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
-        registry.setBuilder(builder2, _defaultBuilderInput(false, false, false, false, false, false));
-        registry.setBuilder(builder3, _defaultBuilderInput(true, false, false, true, false, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(false, false, false, false));
+        registry.setBuilder(builder3, _defaultBuilderInput(false, false, true, false));
         vm.stopPrank();
 
         address[] memory all = registry.getAllBuilders(curator1);
-        // all existing, regardless of active/recommended
+        // all existing
         assertEq(all.length, 3);
         // order: push sequence
         assertEq(all[0], builder1);
@@ -187,40 +164,15 @@ contract BuilderRegistryTest is Test {
         assertEq(all[2], builder3);
     }
 
-    function testGetActiveBuilders() public {
-        vm.startPrank(curator1);
-        // active + recommended
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
-        // inactive
-        registry.setBuilder(builder2, _defaultBuilderInput(false, true, true, false, true, true));
-        // active but not recommended
-        registry.setBuilder(builder3, _defaultBuilderInput(true, false, false, true, false, true));
-        vm.stopPrank();
-
-        // Use getBuildersByFilter with active=true filter
-        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, false, false, false, false);
-        uint8 filterMask = 0x01; // bit 0 = active
-        address[] memory active = registry.getBuildersByFilter(curator1, filter, filterMask);
-        assertEq(active.length, 2);
-
-        // Should contain builder1 and builder3 (order preserved)
-        assertEq(active[0], builder1);
-        assertEq(active[1], builder3);
-    }
-
     function testGetRecommendedBuilders() public {
         vm.startPrank(curator1);
-        // active + recommended
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
-        // inactive + recommended → should NOT appear
-        registry.setBuilder(builder2, _defaultBuilderInput(false, true, true, false, true, true));
-        // active but not recommended
-        registry.setBuilder(builder3, _defaultBuilderInput(true, false, false, true, false, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(false, true, true, true));
+        registry.setBuilder(builder3, _defaultBuilderInput(false, false, true, false));
         vm.stopPrank();
 
-        // Use getBuildersByFilter with active=true and recommended=true
-        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, true, false, false, false, false);
-        uint8 filterMask = 0x03; // bit 0 = active, bit 1 = recommended
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, false, false);
+        uint8 filterMask = 0x01; // bit 0 = recommended
         address[] memory rec = registry.getBuildersByFilter(curator1, filter, filterMask);
         assertEq(rec.length, 1);
         assertEq(rec[0], builder1);
@@ -228,52 +180,48 @@ contract BuilderRegistryTest is Test {
 
     function testGetBuildersByFilterTrustedPayment() public {
         vm.startPrank(curator1);
-        // active + trustedPayment
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
-        // active but not trustedPayment
-        registry.setBuilder(builder2, _defaultBuilderInput(true, true, false, true, true, true));
-        // inactive + trustedPayment
-        registry.setBuilder(builder3, _defaultBuilderInput(false, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(true, false, true, true));
+        registry.setBuilder(builder3, _defaultBuilderInput(false, true, true, false));
         vm.stopPrank();
 
-        // Use getBuildersByFilter with active=true and trustedPayment=true
-        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, true, false, false, false);
-        uint8 filterMask = 0x05; // bit 0 = active, bit 2 = trustedPayment
+        // Use getBuildersByFilter with trustedPayment=true
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(false, true, false, false);
+        uint8 filterMask = 0x02; // bit 1 = trustedPayment
         address[] memory trustedOnly = registry.getBuildersByFilter(curator1, filter, filterMask);
 
-        // only builder1 (active + trustedPayment)
-        assertEq(trustedOnly.length, 1);
+        // builder1 and builder3 have trustedPayment
+        assertEq(trustedOnly.length, 2);
         assertEq(trustedOnly[0], builder1);
+        assertEq(trustedOnly[1], builder3);
     }
 
     function testGetBuildersByFilterTrustlessAndOFAC() public {
         vm.startPrank(curator1);
-        // active, trustless, OFAC
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true, true, true));
-        // active, trustless, non-OFAC
-        registry.setBuilder(builder2, _defaultBuilderInput(true, true, false, true, false, true));
-        // inactive, trustless, OFAC
-        registry.setBuilder(builder3, _defaultBuilderInput(false, true, false, true, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(true, true, true, false));
+        registry.setBuilder(builder3, _defaultBuilderInput(false, false, true, true));
         vm.stopPrank();
 
-        // Use getBuildersByFilter with active=true, trustlessPayment=true, and ofacCompliant=true
-        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(true, false, false, true, true, false);
-        uint8 filterMask = 0x19; // bit 0 = active, bit 3 = trustlessPayment, bit 4 = ofacCompliant
+        // Use getBuildersByFilter with trustlessPayment=true and ofacCompliant=true
+        BuilderRegistry.BuilderInfo memory filter = _defaultBuilderInput(false, false, true, true);
+        uint8 filterMask = 0x0C; // bit 2 = trustlessPayment, bit 3 = ofacCompliant
         address[] memory result = registry.getBuildersByFilter(curator1, filter, filterMask);
 
-        // only builder1 matches all three conditions
-        assertEq(result.length, 1);
+        // builder1 and builder3 match trustless + OFAC
+        assertEq(result.length, 2);
         assertEq(result[0], builder1);
+        assertEq(result[1], builder3);
     }
 
     function testSeparatedNamespacesPerCurator() public {
         // curator1: builder1
         vm.prank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
 
         // curator2: builder2 only
         vm.prank(curator2);
-        registry.setBuilder(builder2, _defaultBuilderInput(true, true, false, true, false, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(false, false, true, false));
 
         address[] memory list1 = registry.getAllBuilders(curator1);
         address[] memory list2 = registry.getAllBuilders(curator2);
@@ -287,8 +235,8 @@ contract BuilderRegistryTest is Test {
 
     function testRemoveBuilderDoesNotBreakGetAllBuilders() public {
         vm.startPrank(curator1);
-        registry.setBuilder(builder1, _defaultBuilderInput(true, true, true, false, true, true));
-        registry.setBuilder(builder2, _defaultBuilderInput(true, true, true, false, true, true));
+        registry.setBuilder(builder1, _defaultBuilderInput(true, true, false, true));
+        registry.setBuilder(builder2, _defaultBuilderInput(false, true, true, false));
         vm.stopPrank();
 
         vm.prank(curator1);
