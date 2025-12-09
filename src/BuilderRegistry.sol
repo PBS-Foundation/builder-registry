@@ -18,20 +18,16 @@ contract BuilderRegistry {
 
     /**
      * @notice Metadata structure for a builder
-     * @param active Whether the builder is currently active
      * @param recommended Whether the builder is recommended for use
      * @param trustedPayment Whether the builder supports trusted payments
      * @param trustlessPayment Whether the builder supports trustless payments
      * @param ofacCompliant Whether the builder is OFAC compliant
-     * @param blobSupport Whether the builder supports blobs
      */
     struct BuilderInfo {
-        bool active;
         bool recommended;
         bool trustedPayment;
         bool trustlessPayment;
         bool ofacCompliant;
-        bool blobSupport;
     }
 
     /// @notice Mapping from curator to builder to their metadata
@@ -75,22 +71,18 @@ contract BuilderRegistry {
      * @notice Emitted when a builder's information is set or updated
      * @param curator The address of the curator managing this builder
      * @param builder The address of the builder
-     * @param active Whether the builder is active
      * @param recommended Whether the builder is recommended
      * @param trustedPayment Whether the builder supports trusted payments
      * @param trustlessPayment Whether the builder supports trustless payments
      * @param ofacCompliant Whether the builder is OFAC compliant
-     * @param blobSupport Whether the builder supports blob transactions
      */
     event BuilderSet(
         address indexed curator,
         address indexed builder,
-        bool active,
         bool recommended,
         bool trustedPayment,
         bool trustlessPayment,
-        bool ofacCompliant,
-        bool blobSupport
+        bool ofacCompliant
     );
 
     /**
@@ -185,22 +177,18 @@ contract BuilderRegistry {
             builderIndexByCurator[msg.sender][builder] = builderListByCurator[msg.sender].length;
         }
 
-        stored.active = info.active;
         stored.recommended = info.recommended;
         stored.trustedPayment = info.trustedPayment;
         stored.trustlessPayment = info.trustlessPayment;
         stored.ofacCompliant = info.ofacCompliant;
-        stored.blobSupport = info.blobSupport;
 
         emit BuilderSet(
             msg.sender,
             builder,
-            info.active,
             info.recommended,
             info.trustedPayment,
             info.trustlessPayment,
-            info.ofacCompliant,
-            info.blobSupport
+            info.ofacCompliant
         );
     }
 
@@ -259,13 +247,13 @@ contract BuilderRegistry {
      * @notice Get builders that match the specified filter criteria
      * @dev Compares builder state directly with the requested values.
      *      Only fields where `filterMask` bit is set are checked.
-     *      Bit positions: 0=active, 1=recommended, 2=trustedPayment, 3=trustlessPayment, 4=ofacCompliant, 5=blobSupport
+     *      Bit positions: 0=recommended, 1=trustedPayment, 2=trustlessPayment, 3=ofacCompliant
      *      Example: To get recommended builders that are NOT OFAC compliant:
-     *      - filterMask = 010010 (bits 1 and 4 set = check recommended and ofacCompliant)
+     *      - filterMask = 1001 (bits 0 and 3 set = check recommended and ofacCompliant)
      *      - filter = BuilderInfo({recommended: true, ofacCompliant: false, ...})
      * @param curator The address of the curator
      * @param filter The exact state values to match against
-     * @param filterMask Bitmask indicating which fields to check (bit 0=active, 1=recommended, 2=trustedPayment, 3=trustlessPayment, 4=ofacCompliant, 5=blobSupport)
+     * @param filterMask Bitmask indicating which fields to check (bit 0=recommended, 1=trustedPayment, 2=trustlessPayment, 3=ofacCompliant)
      * @return Array of builder addresses matching all specified filter criteria
      */
     function getBuildersByFilter(address curator, BuilderInfo calldata filter, uint8 filterMask)
@@ -307,16 +295,12 @@ contract BuilderRegistry {
         BuilderInfo storage info = buildersByCurator[curator][builder];
 
         // check each field if the corresponding bit is set in filterMask
-        if ((filterMask & 0x01) != 0 && info.active != filter.active) {
+        if ((filterMask & 0x01) != 0 && info.recommended != filter.recommended) {
             return false;
         }
-        if ((filterMask & 0x02) != 0 && info.recommended != filter.recommended) {
-            return false;
-        }
-        if ((filterMask & 0x04) != 0 && info.trustedPayment != filter.trustedPayment) return false;
-        if ((filterMask & 0x08) != 0 && info.trustlessPayment != filter.trustlessPayment) return false;
-        if ((filterMask & 0x10) != 0 && info.ofacCompliant != filter.ofacCompliant) return false;
-        if ((filterMask & 0x20) != 0 && info.blobSupport != filter.blobSupport) {
+        if ((filterMask & 0x02) != 0 && info.trustedPayment != filter.trustedPayment) return false;
+        if ((filterMask & 0x04) != 0 && info.trustlessPayment != filter.trustlessPayment) return false;
+        if ((filterMask & 0x08) != 0 && info.ofacCompliant != filter.ofacCompliant) {
             return false;
         }
 

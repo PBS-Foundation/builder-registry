@@ -53,19 +53,17 @@ The `owner` should be a multisig Safe.
 
 Each curator can publish metadata for builders:
 
-- `active`  
 - `recommended`  
 - `trustedPayment`  
 - `trustlessPayment`  
-- `ofacCompliant`  
-- `blobSupport`
+- `ofacCompliant`
 
 Curator functions:
 
 - `setBuilder(address builder, BuilderInfo info)`  
 - `removeBuilder(address builder)`
 
-Builder are completely removed from both the mapping and the list.
+Builders are completely removed from both the mapping and the list.
 
 ---
 
@@ -84,14 +82,14 @@ struct Curator {
 
 ```solidity
 struct BuilderInfo {
-    bool active;
     bool recommended;
     bool trustedPayment;
     bool trustlessPayment;
     bool ofacCompliant;
-    bool blobSupport;
 }
 ```
+
+Builder existence is tracked via an internal index mapping. Use `isBuilderRegistered(curator, builder)` to check registration.
 ---
 
 ## Events
@@ -120,12 +118,10 @@ Read-only functions that proposer clients can call:
 - `getBuildersByFilter(address curator, BuilderInfo filter, uint8 filterMask)`  
   - Returns builders matching the specified filter criteria using a bitmask system.
   - **Filter Mask Bits:**
-    - Bit 0 (0x01): `active`
-    - Bit 1 (0x02): `recommended`
-    - Bit 2 (0x04): `trustedPayment`
-    - Bit 3 (0x08): `trustlessPayment`
-    - Bit 4 (0x10): `ofacCompliant`
-    - Bit 5 (0x20): `blobSupport`
+    - Bit 0 (0x01): `recommended`
+    - Bit 1 (0x02): `trustedPayment`
+    - Bit 2 (0x04): `trustlessPayment`
+    - Bit 3 (0x08): `ofacCompliant`
   - Only fields where the corresponding bit is set in `filterMask` are checked.
   - The `filter` parameter specifies the exact values to match against.
 
@@ -150,63 +146,42 @@ address[] memory all = registry.getAllBuilders(curator);
 bool registered = registry.isBuilderRegistered(curator, builder);
 ```
 
-### Get active builders
-
-```solidity
-BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
-    active: true,
-    recommended: false,
-    trustedPayment: false,
-    trustlessPayment: false,
-    ofacCompliant: false,
-    blobSupport: false
-});
-uint8 filterMask = 0x01; // bit 0 = active
-address[] memory active = registry.getBuildersByFilter(curator, filter, filterMask);
-```
-
 ### Get recommended builders
 
 ```solidity
 BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
-    active: true,
     recommended: true,
     trustedPayment: false,
     trustlessPayment: false,
-    ofacCompliant: false,
-    blobSupport: false
+    ofacCompliant: false
 });
-uint8 filterMask = 0x03; // bit 0 = active, bit 1 = recommended
+uint8 filterMask = 0x01; // bit 0 = recommended
 address[] memory rec = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
-### Get blob-supporting builders
+### Get trustless + OFAC-compliant builders
 
 ```solidity
 BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
-    active: true,
     recommended: false,
     trustedPayment: false,
-    trustlessPayment: false,
-    ofacCompliant: false,
-    blobSupport: true
+    trustlessPayment: true,
+    ofacCompliant: true
 });
-uint8 filterMask = 0x21; // bit 0 = active, bit 5 = blobSupport
-address[] memory blobBuilders = registry.getBuildersByFilter(curator, filter, filterMask);
+uint8 filterMask = 0x0C; // bit 2 = trustlessPayment, bit 3 = ofacCompliant
+address[] memory trustlessOfac = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
 ### Filter builders (trusted payment + OFAC-compliant)
 
 ```solidity
 BuilderRegistry.BuilderInfo memory filter = BuilderRegistry.BuilderInfo({
-    active: true,
     recommended: false,
     trustedPayment: true,
     trustlessPayment: false,
-    ofacCompliant: true,
-    blobSupport: false
+    ofacCompliant: true
 });
-uint8 filterMask = 0x15; // bit 0 = active, bit 2 = trustedPayment, bit 4 = ofacCompliant
+uint8 filterMask = 0x0A; // bit 1 = trustedPayment, bit 3 = ofacCompliant
 address[] memory filtered = registry.getBuildersByFilter(curator, filter, filterMask);
 ```
 
