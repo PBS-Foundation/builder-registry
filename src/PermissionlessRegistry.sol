@@ -6,39 +6,37 @@ import {BLS12381} from "./BLS12381.sol";
 
 /// @title PermissionlessRegistry
 /// @notice ERC-8218 permissionless builder registry with BLS12-381 signature
-///         verification via EIP-2537 precompiles.
+/// verification via EIP-2537 precompiles.
 contract PermissionlessRegistry is IBuilderRegistry, IBuilderList {
-    // ── Storage ──────────────────────────────────────────────────────────
-
     /// @notice Ordered list of builder records.
     BuilderRecord[] internal _builders;
 
-    /// @notice pubkey hash → index+1 in `_builders` (0 = not registered).
+    /// @notice Pubkey hash to 1-based index in `_builders` (0 means not registered).
     mapping(bytes32 => uint256) internal _indexByPubkeyHash;
 
-    /// @notice pubkey hash → nonce → used flag.
+    /// @notice Pubkey hash to nonce to used flag.
     mapping(bytes32 => mapping(bytes32 => bool)) internal _usedNonces;
 
-    // ── Errors ───────────────────────────────────────────────────────────
-    error InvalidPubkeyLength();
+    /// @dev Thrown when the pubkey is not exactly 48 bytes.
+    error InvalidPubkeyLength(uint256 length);
+    /// @dev Thrown when the FQDN is empty.
     error EmptyFQDN();
+    /// @dev Thrown when a nonce has already been consumed for a given pubkey.
     error NonceAlreadyUsed();
-    error InvalidSignatureLength();
+    /// @dev Thrown when the signature is not 192 or 256 bytes.
+    error InvalidSignatureLength(uint256 length);
+    /// @dev Thrown when the BLS pairing check fails.
     error SignatureVerificationFailed();
+    /// @dev Thrown when the requested builder index is out of range.
     error IndexOutOfBounds();
 
-    // ── IBuilderRegistry ─────────────────────────────────────────────────
-
     /// @inheritdoc IBuilderRegistry
-    function registerBuilder(
-        bytes calldata pubkey,
-        string calldata fqdn,
-        bytes32 nonce,
-        bytes calldata signature
-    ) external {
-        if (pubkey.length != 48) revert InvalidPubkeyLength();
+    function registerBuilder(bytes calldata pubkey, string calldata fqdn, bytes32 nonce, bytes calldata signature)
+        external
+    {
+        if (pubkey.length != 48) revert InvalidPubkeyLength(pubkey.length);
         if (bytes(fqdn).length == 0) revert EmptyFQDN();
-        if (signature.length != 256) revert InvalidSignatureLength();
+        if (signature.length != 192 && signature.length != 256) revert InvalidSignatureLength(signature.length);
 
         bytes32 pkHash = keccak256(pubkey);
 
@@ -63,15 +61,27 @@ contract PermissionlessRegistry is IBuilderRegistry, IBuilderList {
         emit BuilderRegistered(pubkey, fqdn, nonce);
     }
 
-    // ── IBuilderList ─────────────────────────────────────────────────────
-
     /// @inheritdoc IBuilderList
-    function builderCount(uint256 /* listId */ ) external view returns (uint256) {
+    function builderCount(
+        uint256 /* listId */
+    )
+        external
+        view
+        returns (uint256)
+    {
         return _builders.length;
     }
 
     /// @inheritdoc IBuilderList
-    function getBuilderAtIndex(uint256, /* listId */ uint256 index) external view returns (BuilderRecord memory) {
+    function getBuilderAtIndex(
+        uint256,
+        /* listId */
+        uint256 index
+    )
+        external
+        view
+        returns (BuilderRecord memory)
+    {
         if (index >= _builders.length) revert IndexOutOfBounds();
         return _builders[index];
     }

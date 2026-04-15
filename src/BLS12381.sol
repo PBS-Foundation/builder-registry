@@ -3,41 +3,40 @@ pragma solidity ^0.8.20;
 
 /// @title BLS12381
 /// @notice Minimal BLS12-381 signature verification library using EIP-2537 precompiles.
-/// @dev Supports compressed G1 pubkeys (48 bytes) and uncompressed G2 signatures (256 bytes).
-///      Uses MODEXP (EIP-198) for G1 point decompression and field arithmetic.
+/// @dev Supports compressed G1 pubkeys (48 bytes) and uncompressed G2 signatures:
+/// - 192 bytes: standard uncompressed (4 x 48-byte Fp, Zcash byte order c1||c0)
+/// - 256 bytes: EIP-2537 native (4 x 64-byte Fp, c0||c1 order)
+/// Uses MODEXP (EIP-198) for G1 point decompression and field arithmetic.
 library BLS12381 {
-    // ── EIP-2537 precompile addresses (Pectra) ─────────────────────────────
-    //   0x0b G1ADD    0x0d G2ADD       0x0f PAIRING
-    //   0x0c G1MSM    0x0e G2MSM       0x10 MAP_FP_TO_G1
-    //                                  0x11 MAP_FP2_TO_G2
+    /// @dev EIP-2537 precompile addresses (Pectra):
+    /// 0x0b G1ADD, 0x0c G1MSM, 0x0d G2ADD, 0x0e G2MSM,
+    /// 0x0f PAIRING, 0x10 MAP_FP_TO_G1, 0x11 MAP_FP2_TO_G2
     address private constant G2ADD = address(0x0d);
     address private constant PAIRING = address(0x0f);
     address private constant MAP_FP2_TO_G2 = address(0x11);
 
-    // ── BLS12-381 field modulus p ───────────────────────────────────────────
-    // p = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
+    /// @dev BLS12-381 field modulus p, stored as two 256-bit words (hi, lo).
+    /// p = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
     uint256 private constant P_HI = 0x000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd7;
     uint256 private constant P_LO = 0x64774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab;
 
-    // (p+1)/4 — exponent for modular square root (p ≡ 3 mod 4)
+    /// @dev (p+1)/4, the exponent for modular square root when p ≡ 3 (mod 4).
     uint256 private constant SQRT_EXP_HI = 0x000000000000000000000000000000000680447a8e5ff9a692c6e9ed90d2eb35;
     uint256 private constant SQRT_EXP_LO = 0xd91dd2e13ce144afd9cc34a83dac3d8907aaffffac54ffffee7fbfffffffeaab;
 
-    // ── G1 generator (uncompressed) ─────────────────────────────────────────
+    /// @dev Canonical BLS12-381 G1 generator point (uncompressed, 128 bytes).
     uint256 private constant G1_X_HI = 0x0000000000000000000000000000000017f1d3a73197d7942695638c4fa9ac0f;
     uint256 private constant G1_X_LO = 0xc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb;
     uint256 private constant G1_Y_HI = 0x0000000000000000000000000000000008b3f481e3aaa0f1a09e30ed741d8ae4;
     uint256 private constant G1_Y_LO = 0xfcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1;
 
-    // ── DST for POP ciphersuite ─────────────────────────────────────────────
+    /// @dev Domain separation tag for the POP ciphersuite (BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_).
     bytes private constant DST = "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-
-    // ── Public API ──────────────────────────────────────────────────────────
 
     /// @notice Verifies a BLS12-381 signature over a message.
     /// @param compressedPubkey 48-byte compressed G1 public key
     /// @param message The signed message bytes
-    /// @param signature 256-byte uncompressed G2 signature
+    /// @param signature Uncompressed G2 signature: 192 bytes (standard) or 256 bytes (EIP-2537)
     /// @return True if the signature is valid
     function verifySignature(bytes calldata compressedPubkey, bytes memory message, bytes calldata signature)
         internal
@@ -45,6 +44,7 @@ library BLS12381 {
         returns (bool)
     {
         bytes memory pk = g1Decompress(compressedPubkey);
+        bytes memory sig = _normalizeG2(signature);
         bytes memory msgHash = hashToCurveG2(message);
 
         // Build pairing input: e(-pk, H(m)) · e(G1_gen, sig) == 1
@@ -78,8 +78,8 @@ library BLS12381 {
             mstore(add(dst, 0x60), G1_Y_LO)
             dst := add(dst, 128)
 
-            // Pair 2: signature from calldata (256 bytes)
-            calldatacopy(dst, signature.offset, 256)
+            // Pair 2: normalized signature from memory (256 bytes)
+            mcopy(dst, add(sig, 32), 256)
         }
 
         (bool ok, bytes memory result) = PAIRING.staticcall(pairingInput);
@@ -87,9 +87,9 @@ library BLS12381 {
         return abi.decode(result, (uint256)) == 1;
     }
 
-    // ── G1 Decompression ────────────────────────────────────────────────────
-
     /// @notice Decompresses a 48-byte compressed G1 point to 128-byte uncompressed form.
+    /// @param compressed 48-byte compressed G1 point (with flag byte).
+    /// @return 128-byte uncompressed G1 point in EIP-2537 format.
     function g1Decompress(bytes calldata compressed) internal view returns (bytes memory) {
         require(compressed.length == 48, "invalid G1 length");
 
@@ -192,9 +192,9 @@ library BLS12381 {
         return result;
     }
 
-    // ── Hash to Curve G2 ────────────────────────────────────────────────────
-
     /// @notice Hashes a message to a G2 point per RFC 9380 §5.
+    /// @param message The message bytes to hash.
+    /// @return 256-byte G2 point in EIP-2537 format.
     function hashToCurveG2(bytes memory message) internal view returns (bytes memory) {
         bytes memory uniform = _expandMsgXmd(message, 256);
 
@@ -216,10 +216,8 @@ library BLS12381 {
         return result;
     }
 
-    // ── Internal helpers ────────────────────────────────────────────────────
-
     /// @dev Reduces two consecutive 64-byte blocks at `offset` in `data` mod p,
-    ///      forming a 128-byte Fp2 element (c0 || c1).
+    /// forming a 128-byte Fp2 element (c0 || c1).
     function _reduceToFp2(bytes memory data, uint256 offset) private view returns (bytes memory) {
         bytes memory result = new bytes(128);
         _fpReduceBlock(data, offset, result, 0);
@@ -228,7 +226,7 @@ library BLS12381 {
     }
 
     /// @dev Reduces a 64-byte block from `src[srcOff..srcOff+64]` mod p via MODEXP,
-    ///      writes the 64-byte result to `dst[dstOff..dstOff+64]`.
+    /// writes the 64-byte result to `dst[dstOff..dstOff+64]`.
     function _fpReduceBlock(bytes memory src, uint256 srcOff, bytes memory dst, uint256 dstOff) private view {
         assembly {
             let scratch := mload(0x40)
@@ -243,6 +241,33 @@ library BLS12381 {
             let ok := staticcall(gas(), 5, scratch, 225, add(add(dst, 32), dstOff), 64)
             if iszero(ok) { revert(0, 0) }
         }
+    }
+
+    /// @dev Normalizes a G2 signature to 256-byte EIP-2537 format.
+    /// - 256 bytes: already EIP-2537, copy as-is (c0||c1 per Fp2, 64-byte padded)
+    /// - 192 bytes: Zcash uncompressed (c1||c0 per Fp2, 48-byte), reorder + pad
+    function _normalizeG2(bytes calldata sig) private pure returns (bytes memory out) {
+        out = new bytes(256);
+        if (sig.length == 256) {
+            assembly {
+                calldatacopy(add(out, 32), sig.offset, 256)
+            }
+            return out;
+        }
+        // 192 bytes: x_c1(48) || x_c0(48) || y_c1(48) || y_c0(48)
+        //        →   x_c0(64) || x_c1(64) || y_c0(64) || y_c1(64)
+        assembly {
+            let dst := add(out, 32)
+            // x_c0: 16 zero pad + sig[48:96]
+            calldatacopy(add(dst, 16), add(sig.offset, 48), 48)
+            // x_c1: 16 zero pad + sig[0:48]
+            calldatacopy(add(dst, 80), sig.offset, 48)
+            // y_c0: 16 zero pad + sig[144:192]
+            calldatacopy(add(dst, 144), add(sig.offset, 144), 48)
+            // y_c1: 16 zero pad + sig[96:144]
+            calldatacopy(add(dst, 208), add(sig.offset, 96), 48)
+        }
+        return out;
     }
 
     /// @dev expand_message_xmd per RFC 9380 §5.3.1 with SHA-256 and the POP DST.

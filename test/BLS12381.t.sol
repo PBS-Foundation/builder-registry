@@ -23,10 +23,7 @@ contract BLS12381Wrapper {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// G1 decompression tests
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// @notice Tests G1 point decompression using known test vectors.
 contract BLS12381_G1DecompressTest is Test {
     BLS12381Wrapper wrapper;
 
@@ -35,7 +32,7 @@ contract BLS12381_G1DecompressTest is Test {
     }
 
     /// @dev Decompress the G1 generator. The compressed form is the x-coordinate
-    ///      with compression flag (0x80) set. Since G1_Y < p-G1_Y, sort flag is 0.
+    /// with compression flag (0x80) set. Since G1_Y < p-G1_Y, sort flag is 0.
     function test_decompressGenerator() public view {
         // G1 generator compressed: 0x97... (0x80 | 0x17 in first byte)
         bytes memory compressed = hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
@@ -92,10 +89,7 @@ contract BLS12381_G1DecompressTest is Test {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Hash-to-curve tests using REAL precompiles (no mocks)
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// @notice Tests hash-to-curve G2 using real EIP-2537 precompiles (no mocks).
 contract BLS12381_HashToCurveTest is Test {
     BLS12381Wrapper wrapper;
 

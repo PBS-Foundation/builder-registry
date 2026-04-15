@@ -6,7 +6,7 @@ import {BuilderRecord, IBuilderRegistry} from "../src/IERC8218.sol";
 import {PermissionlessRegistry} from "../src/PermissionlessRegistry.sol";
 
 /// @dev Harness that exposes a direct insert for unit testing the list
-///      interface without needing valid BLS signatures.
+/// interface without needing valid BLS signatures.
 contract PermissionlessRegistryHarness is PermissionlessRegistry {
     function directInsert(bytes calldata pubkey, string calldata fqdn) external {
         bytes32 pkHash = keccak256(pubkey);
@@ -20,10 +20,7 @@ contract PermissionlessRegistryHarness is PermissionlessRegistry {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Input validation tests
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// @notice Tests input validation (pubkey length, FQDN, signature length).
 contract PermissionlessRegistry_ValidationTest is Test {
     PermissionlessRegistry registry;
 
@@ -36,12 +33,12 @@ contract PermissionlessRegistry_ValidationTest is Test {
     }
 
     function test_revert_InvalidPubkeyLength_tooShort() public {
-        vm.expectRevert(PermissionlessRegistry.InvalidPubkeyLength.selector);
+        vm.expectRevert(abi.encodeWithSelector(PermissionlessRegistry.InvalidPubkeyLength.selector, 47));
         registry.registerBuilder(new bytes(47), "builder.example.com", bytes32(0), validSignature);
     }
 
     function test_revert_InvalidPubkeyLength_tooLong() public {
-        vm.expectRevert(PermissionlessRegistry.InvalidPubkeyLength.selector);
+        vm.expectRevert(abi.encodeWithSelector(PermissionlessRegistry.InvalidPubkeyLength.selector, 49));
         registry.registerBuilder(new bytes(49), "builder.example.com", bytes32(0), validSignature);
     }
 
@@ -50,21 +47,37 @@ contract PermissionlessRegistry_ValidationTest is Test {
         registry.registerBuilder(validPubkey, "", bytes32(0), validSignature);
     }
 
-    function test_revert_InvalidSignatureLength_tooShort() public {
-        vm.expectRevert(PermissionlessRegistry.InvalidSignatureLength.selector);
-        registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(255));
+    function test_revert_InvalidSignatureLength() public {
+        uint256[] memory badLengths = new uint256[](6);
+        badLengths[0] = 0;
+        badLengths[1] = 96;
+        badLengths[2] = 191;
+        badLengths[3] = 193;
+        badLengths[4] = 255;
+        badLengths[5] = 257;
+
+        for (uint256 i = 0; i < badLengths.length; i++) {
+            vm.expectRevert(
+                abi.encodeWithSelector(PermissionlessRegistry.InvalidSignatureLength.selector, badLengths[i])
+            );
+            registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(badLengths[i]));
+        }
     }
 
-    function test_revert_InvalidSignatureLength_tooLong() public {
-        vm.expectRevert(PermissionlessRegistry.InvalidSignatureLength.selector);
-        registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(257));
+    function test_accept_SignatureLength_192() public {
+        // Should pass length validation (will fail at BLS verify, but not at length check)
+        vm.expectRevert(PermissionlessRegistry.SignatureVerificationFailed.selector);
+        registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(192));
+    }
+
+    function test_accept_SignatureLength_256() public {
+        // Should pass length validation (will fail at BLS verify, but not at length check)
+        vm.expectRevert(PermissionlessRegistry.SignatureVerificationFailed.selector);
+        registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), validSignature);
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// IBuilderList interface tests (uses harness to bypass BLS)
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// @notice Tests the IBuilderList interface (uses harness to bypass BLS).
 contract PermissionlessRegistry_BuilderListTest is Test {
     PermissionlessRegistryHarness registry;
 
@@ -153,14 +166,10 @@ contract PermissionlessRegistry_BuilderListTest is Test {
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Full registration flow with real BLS signatures (no mocks)
-//
-// Uses FFI to call a Python script that generates real BLS12-381 signatures
-// via py_ecc. All precompiles (G1 decompression, hash-to-curve, pairing)
-// are exercised with real cryptographic inputs.
-// ─────────────────────────────────────────────────────────────────────────────
-
+/// @notice Full registration flow with real BLS signatures (no mocks).
+/// @dev Uses FFI to call a Python script that generates real BLS12-381 signatures
+/// via py_ecc. All precompiles (G1 decompression, hash-to-curve, pairing)
+/// are exercised with real cryptographic inputs.
 contract PermissionlessRegistry_RegistrationTest is Test {
     PermissionlessRegistry registry;
 
@@ -209,7 +218,26 @@ contract PermissionlessRegistry_RegistrationTest is Test {
         }
     }
 
-    function test_registerBuilder_validSignature() public {
+    /// @dev Convert 256-byte EIP-2537 signature to 192-byte Zcash format.
+    /// EIP-2537: x_c0(64) || x_c1(64) || y_c0(64) || y_c1(64)
+    /// Zcash:    x_c1(48) || x_c0(48) || y_c1(48) || y_c0(48)
+    function _to192(bytes memory sig256) internal pure returns (bytes memory sig192) {
+        sig192 = new bytes(192);
+        assembly {
+            let src := add(sig256, 32)
+            let dst := add(sig192, 32)
+            // x_c1: skip 16 zero-pad bytes from sig256[64:128]
+            mcopy(dst, add(src, 80), 48)
+            // x_c0: skip 16 zero-pad bytes from sig256[0:64]
+            mcopy(add(dst, 48), add(src, 16), 48)
+            // y_c1: skip 16 zero-pad bytes from sig256[192:256]
+            mcopy(add(dst, 96), add(src, 208), 48)
+            // y_c0: skip 16 zero-pad bytes from sig256[128:192]
+            mcopy(add(dst, 144), add(src, 144), 48)
+        }
+    }
+
+    function test_registerBuilder_validSignature_256() public {
         (bytes memory pubkey, bytes memory signature) = _signFFI(fqdn, nonce);
 
         vm.expectEmit();
@@ -221,6 +249,16 @@ contract PermissionlessRegistry_RegistrationTest is Test {
         BuilderRecord memory r = registry.getBuilderAtIndex(0, 0);
         assertEq(r.pubkey, pubkey);
         assertEq(r.fqdn, fqdn);
+    }
+
+    function test_registerBuilder_validSignature_192() public {
+        (bytes memory pubkey, bytes memory signature) = _signFFI(fqdn, nonce);
+        bytes memory sig192 = _to192(signature);
+
+        registry.registerBuilder(pubkey, fqdn, nonce, sig192);
+
+        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, fqdn);
     }
 
     function test_revert_registerBuilder_invalidSignature() public {
