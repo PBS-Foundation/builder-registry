@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {BuilderRecord, IBuilderRegistry} from "../src/IERC8218.sol";
+import {BuilderRecord, IBuilderRegistry} from "../src/interfaces/IERC8218.sol";
 import {PermissionlessRegistry} from "../src/PermissionlessRegistry.sol";
 
 /// @dev Harness that exposes a direct insert for unit testing the list

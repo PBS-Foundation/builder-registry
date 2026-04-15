@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {BLS12381} from "../src/BLS12381.sol";
+import {BLS12381} from "../src/lib/BLS12381.sol";
 
 /// @dev Wrapper to expose BLS12381 library internals for testing.
 contract BLS12381Wrapper {

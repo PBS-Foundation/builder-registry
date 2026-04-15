@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BuilderRecord, IBuilderRegistry, IBuilderList} from "./IERC8218.sol";
-import {BLS12381} from "./BLS12381.sol";
+import {BuilderRecord, IBuilderRegistry, IBuilderList} from "./interfaces/IERC8218.sol";
+import {BLS12381} from "./lib/BLS12381.sol";
 
 /// @title PermissionlessRegistry
 /// @notice ERC-8218 permissionless builder registry with BLS12-381 signature

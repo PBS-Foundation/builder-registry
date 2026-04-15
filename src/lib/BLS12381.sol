@@ -300,7 +300,7 @@ library BLS12381 {
             // Copy result
             result := mload(0x40)
             mstore(result, 256)
-            returndatacopy(add(result, 32), 0, returndatasize())
+            returndatacopy(add(result, 32), 0, 256)
             mstore(0x40, add(result, 288))
         }
         if (!ok2) revert G2AddFailed();
@@ -323,6 +323,7 @@ library BLS12381 {
     function _fpReduceBlock(bytes memory src, uint256 srcOff, bytes memory dst, uint256 dstOff) private view {
         // MODEXP input layout (225 bytes): same structure as g1Decompress step 1,
         // but base = src[srcOff:srcOff+64] and exp = 1 (identity reduction).
+        bool ok;
         assembly {
             let scratch := mload(0x40)
             mstore(scratch, 64) // base_len
@@ -333,9 +334,9 @@ library BLS12381 {
             mstore(add(scratch, 0xa1), P_HI) // mod
             mstore(add(scratch, 0xc1), P_LO)
 
-            let ok := staticcall(gas(), 5, scratch, 225, add(add(dst, 32), dstOff), 64)
-            if iszero(ok) { revert(0, 0) }
+            ok := staticcall(gas(), 5, scratch, 225, add(add(dst, 32), dstOff), 64)
         }
+        if (!ok) revert ModexpFailed();
     }
 
     /// @dev Normalizes a G2 signature to 256-byte EIP-2537 format.
