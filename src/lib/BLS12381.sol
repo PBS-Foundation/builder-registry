@@ -40,12 +40,12 @@ library BLS12381 {
 
     /// @dev BLS12-381 field modulus p, stored as two 256-bit words (hi, lo).
     /// p = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab
-    uint256 private constant P_HI = 0x000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd7;
-    uint256 private constant P_LO = 0x64774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab;
+    uint256 internal constant P_HI = 0x000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd7;
+    uint256 internal constant P_LO = 0x64774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab;
 
     /// @dev (p+1)/4, the exponent for modular square root when p ≡ 3 (mod 4).
-    uint256 private constant SQRT_EXP_HI = 0x000000000000000000000000000000000680447a8e5ff9a692c6e9ed90d2eb35;
-    uint256 private constant SQRT_EXP_LO = 0xd91dd2e13ce144afd9cc34a83dac3d8907aaffffac54ffffee7fbfffffffeaab;
+    uint256 internal constant SQRT_EXP_HI = 0x000000000000000000000000000000000680447a8e5ff9a692c6e9ed90d2eb35;
+    uint256 internal constant SQRT_EXP_LO = 0xd91dd2e13ce144afd9cc34a83dac3d8907aaffffac54ffffee7fbfffffffeaab;
 
     /// @dev Canonical BLS12-381 G1 generator point (uncompressed, 128 bytes).
     /// Source: https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-11.html §4.2.1

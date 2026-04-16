@@ -172,29 +172,99 @@ contract BLS12381_ExpandMsgXmdTest is Test {
     }
 }
 
+/// @notice Fuzz tests for the BLS12381 library.
+contract BLS12381_FuzzTest is Test {
+    BLS12381Wrapper wrapper;
+
+    function setUp() public {
+        wrapper = new BLS12381Wrapper();
+    }
+
+    /// @dev g1Decompress on random 48-byte inputs should either return a valid
+    /// 128-byte point or revert — never panic or return malformed data.
+    function testFuzz_g1Decompress_validOrRevert(bytes32 a, bytes16 b) public view {
+        bytes memory input = abi.encodePacked(a, b);
+        try wrapper.g1Decompress(input) returns (bytes memory result) {
+            assertEq(result.length, 128, "result must be 128 bytes");
+        } catch {}
+    }
+
+    /// @dev Decompressing the same input twice must produce identical output (deterministic).
+    function testFuzz_g1Decompress_deterministic(bytes32 a, bytes16 b) public view {
+        bytes memory input = abi.encodePacked(a, b);
+        try wrapper.g1Decompress(input) returns (bytes memory r1) {
+            bytes memory r2 = wrapper.g1Decompress(input);
+            assertEq(r1, r2, "decompression must be deterministic");
+        } catch {}
+    }
+
+    /// @dev hashToCurveG2 must always return 256 bytes and be deterministic.
+    function testFuzz_hashToCurveG2_deterministic(bytes calldata message) public view {
+        bytes memory a = wrapper.hashToCurveG2(message);
+        bytes memory b = wrapper.hashToCurveG2(message);
+        assertEq(a.length, 256, "must return 256 bytes");
+        assertEq(a, b, "must be deterministic");
+    }
+
+    /// @dev Different messages should (almost certainly) produce different G2 points.
+    function testFuzz_hashToCurveG2_collisionResistance(
+        bytes calldata msg1,
+        bytes calldata msg2
+    ) public view {
+        vm.assume(keccak256(msg1) != keccak256(msg2));
+        bytes memory a = wrapper.hashToCurveG2(msg1);
+        bytes memory b = wrapper.hashToCurveG2(msg2);
+        assertTrue(keccak256(a) != keccak256(b), "different messages must hash to different points");
+    }
+
+    /// @dev Random 256-byte signatures should never verify against the G1 generator.
+    function testFuzz_verifySignature_rejectsRandom256(bytes32 seed) public view {
+        bytes memory pk =
+            hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+        // Build a pseudorandom 256-byte signature from the seed
+        bytes memory sig = new bytes(256);
+        for (uint256 i = 0; i < 8; i++) {
+            bytes32 chunk = keccak256(abi.encodePacked(seed, i));
+            assembly {
+                mstore(add(add(sig, 32), mul(i, 32)), chunk)
+            }
+        }
+        bool valid = wrapper.verifySignature(pk, bytes("fuzz"), sig);
+        assertFalse(valid, "random signature must not verify");
+    }
+
+    /// @dev Random 192-byte signatures should never verify against the G1 generator.
+    function testFuzz_verifySignature_rejectsRandom192(bytes32 seed) public view {
+        bytes memory pk =
+            hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+        bytes memory sig = new bytes(192);
+        for (uint256 i = 0; i < 6; i++) {
+            bytes32 chunk = keccak256(abi.encodePacked(seed, i));
+            assembly {
+                mstore(add(add(sig, 32), mul(i, 32)), chunk)
+            }
+        }
+        bool valid = wrapper.verifySignature(pk, bytes("fuzz"), sig);
+        assertFalse(valid, "random signature must not verify");
+    }
+}
+
 /// @notice Verify hardcoded constants are mathematically correct.
 contract BLS12381_ConstantsTest is Test {
     /// @dev Verify p mod 4 == 3 (prerequisite for Tonelli-Shanks shortcut).
     function test_pMod4Is3() public pure {
-        uint256 P_LO = 0x64774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab;
-        // p mod 4 is determined by the last 2 bits of P_LO
-        assertEq(P_LO & 3, 3, "p mod 4 must be 3");
+        assertEq(BLS12381.P_LO & 3, 3, "p mod 4 must be 3");
     }
 
     /// @dev Verify SQRT_EXP = (p + 1) / 4 by checking 4 * SQRT_EXP == p + 1.
     function test_sqrtExpIsCorrect() public pure {
-        uint256 P_HI = 0x000000000000000000000000000000001a0111ea397fe69a4b1ba7b6434bacd7;
-        uint256 P_LO = 0x64774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab;
-        uint256 SQRT_EXP_HI = 0x000000000000000000000000000000000680447a8e5ff9a692c6e9ed90d2eb35;
-        uint256 SQRT_EXP_LO = 0xd91dd2e13ce144afd9cc34a83dac3d8907aaffffac54ffffee7fbfffffffeaab;
-
         // Compute 4 * SQRT_EXP (384-bit multiply by 4 = shift left 2)
-        uint256 fourExpLo = SQRT_EXP_LO << 2;
-        uint256 fourExpHi = (SQRT_EXP_HI << 2) | (SQRT_EXP_LO >> 254);
+        uint256 fourExpLo = BLS12381.SQRT_EXP_LO << 2;
+        uint256 fourExpHi = (BLS12381.SQRT_EXP_HI << 2) | (BLS12381.SQRT_EXP_LO >> 254);
 
         // Compute p + 1 (384-bit add)
-        uint256 pPlusOneLo = P_LO + 1;
-        uint256 pPlusOneHi = P_HI;
+        uint256 pPlusOneLo = BLS12381.P_LO + 1;
+        uint256 pPlusOneHi = BLS12381.P_HI;
         if (pPlusOneLo == 0) pPlusOneHi += 1; // carry (won't happen for this p, but correct)
 
         assertEq(fourExpHi, pPlusOneHi, "SQRT_EXP_HI mismatch: 4*exp != p+1");
