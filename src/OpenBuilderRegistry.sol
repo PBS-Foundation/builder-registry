@@ -4,10 +4,10 @@ pragma solidity ^0.8.20;
 import {BuilderRecord, IBuilderRegistry, IBuilderList} from "./interfaces/IERC8218.sol";
 import {BLS12381} from "./lib/BLS12381.sol";
 
-/// @title PermissionlessRegistry
-/// @notice ERC-8218 permissionless builder registry with BLS12-381 signature
+/// @title OpenBuilderRegistry
+/// @notice ERC-8218 open builder registry implementation with BLS12-381 signature
 /// verification via EIP-2537 precompiles.
-contract PermissionlessRegistry is IBuilderRegistry, IBuilderList {
+contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
     /// @notice Ordered list of builder records.
     BuilderRecord[] internal _builders;
 

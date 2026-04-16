@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a real BLS12-381 signature for PermissionlessRegistry tests.
+"""Generate a real BLS12-381 signature for OpenBuilderRegistry tests.
 
 Usage: bls_sign.py <chainid> <registry_address> <fqdn> <nonce_hex>
 

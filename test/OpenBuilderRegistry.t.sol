@@ -3,11 +3,11 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {BuilderRecord, IBuilderRegistry} from "../src/interfaces/IERC8218.sol";
-import {PermissionlessRegistry} from "../src/PermissionlessRegistry.sol";
+import {OpenBuilderRegistry} from "../src/OpenBuilderRegistry.sol";
 
 /// @dev Harness that exposes a direct insert for unit testing the list
 /// interface without needing valid BLS signatures.
-contract PermissionlessRegistryHarness is PermissionlessRegistry {
+contract OpenBuilderRegistryHarness is OpenBuilderRegistry {
     function directInsert(bytes calldata pubkey, string calldata fqdn) external {
         bytes32 pkHash = keccak256(pubkey);
         uint256 idx = _indexByPubkeyHash[pkHash];
@@ -21,29 +21,29 @@ contract PermissionlessRegistryHarness is PermissionlessRegistry {
 }
 
 /// @notice Tests input validation (pubkey length, FQDN, signature length).
-contract PermissionlessRegistry_ValidationTest is Test {
-    PermissionlessRegistry registry;
+contract OpenBuilderRegistry_ValidationTest is Test {
+    OpenBuilderRegistry registry;
 
     bytes validPubkey = new bytes(48);
     bytes validSignature = new bytes(256);
 
     function setUp() public {
-        registry = new PermissionlessRegistry();
+        registry = new OpenBuilderRegistry();
         validPubkey[0] = 0x80; // compression flag
     }
 
     function test_revert_InvalidPubkeyLength_tooShort() public {
-        vm.expectRevert(abi.encodeWithSelector(PermissionlessRegistry.InvalidPubkeyLength.selector, 47));
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.InvalidPubkeyLength.selector, 47));
         registry.registerBuilder(new bytes(47), "builder.example.com", bytes32(0), validSignature);
     }
 
     function test_revert_InvalidPubkeyLength_tooLong() public {
-        vm.expectRevert(abi.encodeWithSelector(PermissionlessRegistry.InvalidPubkeyLength.selector, 49));
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.InvalidPubkeyLength.selector, 49));
         registry.registerBuilder(new bytes(49), "builder.example.com", bytes32(0), validSignature);
     }
 
     function test_revert_EmptyFQDN() public {
-        vm.expectRevert(PermissionlessRegistry.EmptyFQDN.selector);
+        vm.expectRevert(OpenBuilderRegistry.EmptyFQDN.selector);
         registry.registerBuilder(validPubkey, "", bytes32(0), validSignature);
     }
 
@@ -58,7 +58,7 @@ contract PermissionlessRegistry_ValidationTest is Test {
 
         for (uint256 i = 0; i < badLengths.length; i++) {
             vm.expectRevert(
-                abi.encodeWithSelector(PermissionlessRegistry.InvalidSignatureLength.selector, badLengths[i])
+                abi.encodeWithSelector(OpenBuilderRegistry.InvalidSignatureLength.selector, badLengths[i])
             );
             registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(badLengths[i]));
         }
@@ -66,27 +66,27 @@ contract PermissionlessRegistry_ValidationTest is Test {
 
     function test_accept_SignatureLength_192() public {
         // Should pass length validation (will fail at BLS verify, but not at length check)
-        vm.expectRevert(PermissionlessRegistry.SignatureVerificationFailed.selector);
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(192));
     }
 
     function test_accept_SignatureLength_256() public {
         // Should pass length validation (will fail at BLS verify, but not at length check)
-        vm.expectRevert(PermissionlessRegistry.SignatureVerificationFailed.selector);
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), validSignature);
     }
 }
 
 /// @notice Tests the IBuilderList interface (uses harness to bypass BLS).
-contract PermissionlessRegistry_BuilderListTest is Test {
-    PermissionlessRegistryHarness registry;
+contract OpenBuilderRegistry_BuilderListTest is Test {
+    OpenBuilderRegistryHarness registry;
 
     bytes pk1;
     bytes pk2;
     bytes pk3;
 
     function setUp() public {
-        registry = new PermissionlessRegistryHarness();
+        registry = new OpenBuilderRegistryHarness();
 
         pk1 = new bytes(48);
         pk1[0] = 0x01;
@@ -133,13 +133,13 @@ contract PermissionlessRegistry_BuilderListTest is Test {
     }
 
     function test_revert_getBuilderAtIndex_outOfBounds() public {
-        vm.expectRevert(PermissionlessRegistry.IndexOutOfBounds.selector);
+        vm.expectRevert(OpenBuilderRegistry.IndexOutOfBounds.selector);
         registry.getBuilderAtIndex(0, 0);
     }
 
     function test_revert_getBuilderAtIndex_exactBoundary() public {
         registry.directInsert(pk1, "a.example.com");
-        vm.expectRevert(PermissionlessRegistry.IndexOutOfBounds.selector);
+        vm.expectRevert(OpenBuilderRegistry.IndexOutOfBounds.selector);
         registry.getBuilderAtIndex(0, 1);
     }
 
@@ -170,14 +170,14 @@ contract PermissionlessRegistry_BuilderListTest is Test {
 /// @dev Uses FFI to call a Python script that generates real BLS12-381 signatures
 /// via py_ecc. All precompiles (G1 decompression, hash-to-curve, pairing)
 /// are exercised with real cryptographic inputs.
-contract PermissionlessRegistry_RegistrationTest is Test {
-    PermissionlessRegistry registry;
+contract OpenBuilderRegistry_RegistrationTest is Test {
+    OpenBuilderRegistry registry;
 
     string fqdn = "builder.example.com";
     bytes32 nonce = bytes32(uint256(1));
 
     function setUp() public {
-        registry = new PermissionlessRegistry();
+        registry = new OpenBuilderRegistry();
     }
 
     /// @dev Call the Python signing script via FFI to get a real BLS signature.
@@ -267,7 +267,7 @@ contract PermissionlessRegistry_RegistrationTest is Test {
         // Corrupt one byte of the signature
         signature[100] = signature[100] ^ 0xff;
 
-        vm.expectRevert(PermissionlessRegistry.SignatureVerificationFailed.selector);
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(pubkey, fqdn, nonce, signature);
     }
 }
