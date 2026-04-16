@@ -18,6 +18,20 @@ contract OpenBuilderRegistryHarness is OpenBuilderRegistry {
             _builders[idx - 1].fqdn = fqdn;
         }
     }
+
+    function directRemove(bytes calldata pubkey) external {
+        bytes32 pkHash = keccak256(pubkey);
+        uint256 idx = _indexByPubkeyHash[pkHash];
+        require(idx != 0, "not found");
+        uint256 lastIdx = _builders.length;
+        if (idx != lastIdx) {
+            BuilderRecord storage last = _builders[lastIdx - 1];
+            _builders[idx - 1] = last;
+            _indexByPubkeyHash[keccak256(last.pubkey)] = idx;
+        }
+        _builders.pop();
+        delete _indexByPubkeyHash[pkHash];
+    }
 }
 
 /// @notice Tests input validation (pubkey length, FQDN, signature length).
@@ -154,6 +168,47 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
         assertEq(r.fqdn, "new.example.com");
     }
 
+    function test_directRemove_single() public {
+        registry.directInsert(pk1, "a.example.com");
+        assertEq(registry.builderCount(0), 1);
+
+        registry.directRemove(pk1);
+        assertEq(registry.builderCount(0), 0);
+    }
+
+    function test_directRemove_swapAndPop() public {
+        registry.directInsert(pk1, "first.example.com");
+        registry.directInsert(pk2, "second.example.com");
+        registry.directInsert(pk3, "third.example.com");
+        assertEq(registry.builderCount(0), 3);
+
+        // Remove pk1 (index 0) — pk3 should swap into its place
+        registry.directRemove(pk1);
+        assertEq(registry.builderCount(0), 2);
+        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "third.example.com");
+        assertEq(registry.getBuilderAtIndex(0, 1).fqdn, "second.example.com");
+    }
+
+    function test_directRemove_last() public {
+        registry.directInsert(pk1, "first.example.com");
+        registry.directInsert(pk2, "second.example.com");
+
+        // Remove last element — no swap needed
+        registry.directRemove(pk2);
+        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "first.example.com");
+    }
+
+    function test_directRemove_thenReinsert() public {
+        registry.directInsert(pk1, "a.example.com");
+        registry.directRemove(pk1);
+        assertEq(registry.builderCount(0), 0);
+
+        registry.directInsert(pk1, "b.example.com");
+        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "b.example.com");
+    }
+
     function test_multipleBuilders_orderPreserved() public {
         registry.directInsert(pk1, "first.example.com");
         registry.directInsert(pk2, "second.example.com");
@@ -259,6 +314,71 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
 
         assertEq(registry.builderCount(0), 1);
         assertEq(registry.getBuilderAtIndex(0, 0).fqdn, fqdn);
+    }
+
+    /// @dev Call the Python signing script in deregister mode via FFI.
+    function _signDeregisterFFI(bytes32 _nonce)
+        internal
+        returns (bytes memory pubkey, bytes memory signature)
+    {
+        string[] memory cmd = new string[](5);
+        cmd[0] = "python3";
+        cmd[1] = "script/bls_sign.py";
+        cmd[2] = vm.toString(block.chainid);
+        cmd[3] = vm.toString(address(registry));
+        cmd[4] = "--deregister";
+        // Replace cmd[4] with flag and add nonce as cmd[5]
+        string[] memory cmd2 = new string[](6);
+        cmd2[0] = "python3";
+        cmd2[1] = "script/bls_sign.py";
+        cmd2[2] = vm.toString(block.chainid);
+        cmd2[3] = vm.toString(address(registry));
+        cmd2[4] = "--deregister";
+        cmd2[5] = vm.toString(_nonce);
+
+        bytes memory result = vm.ffi(cmd2);
+        require(result.length == 304, "FFI output must be 304 bytes");
+
+        pubkey = new bytes(48);
+        signature = new bytes(256);
+
+        assembly {
+            let src := add(result, 32)
+            let dst := add(pubkey, 32)
+            mstore(dst, mload(src))
+            mstore(add(dst, 16), mload(add(src, 16)))
+
+            src := add(add(result, 32), 48)
+            dst := add(signature, 32)
+            for { let i := 0 } lt(i, 256) { i := add(i, 32) } {
+                mstore(add(dst, i), mload(add(src, i)))
+            }
+        }
+    }
+
+    function test_deregisterBuilder_validSignature() public {
+        // First register
+        (bytes memory pubkey, bytes memory regSig) = _signFFI(fqdn, nonce);
+        registry.registerBuilder(pubkey, fqdn, nonce, regSig);
+        assertEq(registry.builderCount(0), 1);
+
+        // Then deregister with a different nonce
+        bytes32 deregNonce = bytes32(uint256(2));
+        (, bytes memory deregSig) = _signDeregisterFFI(deregNonce);
+
+        vm.expectEmit();
+        emit IBuilderRegistry.BuilderDeregistered(pubkey, deregNonce);
+
+        registry.deregisterBuilder(pubkey, deregNonce, deregSig);
+        assertEq(registry.builderCount(0), 0);
+    }
+
+    function test_revert_deregisterBuilder_notRegistered() public {
+        bytes32 deregNonce = bytes32(uint256(2));
+        (bytes memory pubkey, bytes memory deregSig) = _signDeregisterFFI(deregNonce);
+
+        vm.expectRevert(OpenBuilderRegistry.NotRegistered.selector);
+        registry.deregisterBuilder(pubkey, deregNonce, deregSig);
     }
 
     function test_revert_registerBuilder_invalidSignature() public {

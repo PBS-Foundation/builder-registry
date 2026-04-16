@@ -8,10 +8,17 @@ struct BuilderRecord {
 
 interface IBuilderRegistry {
     event BuilderRegistered(bytes pubkey, string fqdn, bytes32 nonce);
+    event BuilderDeregistered(bytes pubkey, bytes32 nonce);
 
     function registerBuilder(
         bytes calldata pubkey,
         string calldata fqdn,
+        bytes32 nonce,
+        bytes calldata signature
+    ) external;
+
+    function deregisterBuilder(
+        bytes calldata pubkey,
         bytes32 nonce,
         bytes calldata signature
     ) external;
