@@ -61,6 +61,27 @@ contract OpenBuilderRegistry_ValidationTest is Test {
         registry.registerBuilder(validPubkey, "", bytes32(0), validSignature);
     }
 
+    function test_revert_FQDNTooLong() public {
+        uint256 tooLong = registry.MAX_FQDN_LENGTH() + 1;
+        bytes memory fqdnBytes = new bytes(tooLong);
+        for (uint256 i = 0; i < tooLong; i++) {
+            fqdnBytes[i] = "a";
+        }
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.FQDNTooLong.selector, tooLong));
+        registry.registerBuilder(validPubkey, string(fqdnBytes), bytes32(0), validSignature);
+    }
+
+    function test_accept_FQDNAtMaxLength() public {
+        uint256 maxLen = registry.MAX_FQDN_LENGTH();
+        bytes memory fqdnBytes = new bytes(maxLen);
+        for (uint256 i = 0; i < maxLen; i++) {
+            fqdnBytes[i] = "a";
+        }
+        // Should pass length validation and fail later at BLS verification.
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
+        registry.registerBuilder(validPubkey, string(fqdnBytes), bytes32(0), validSignature);
+    }
+
     function test_revert_InvalidSignatureLength() public {
         uint256[] memory badLengths = new uint256[](6);
         badLengths[0] = 0;

@@ -8,6 +8,9 @@ import {BLS12381} from "./lib/BLS12381.sol";
 /// @notice ERC-8218 open builder registry implementation with BLS12-381 signature
 /// verification via EIP-2537 precompiles.
 contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
+    /// @notice Maximum FQDN length in bytes (RFC 1035 §2.3.4).
+    uint256 public constant MAX_FQDN_LENGTH = 253;
+
     /// @notice Ordered list of builder records.
     BuilderRecord[] internal _builders;
 
@@ -21,6 +24,8 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
     error InvalidPubkeyLength(uint256 length);
     /// @dev Thrown when the FQDN is empty.
     error EmptyFQDN();
+    /// @dev Thrown when the FQDN exceeds `MAX_FQDN_LENGTH` bytes.
+    error FQDNTooLong(uint256 length);
     /// @dev Thrown when a nonce has already been consumed for a given pubkey.
     error NonceAlreadyUsed();
     /// @dev Thrown when the signature is not 192 or 256 bytes.
@@ -33,11 +38,15 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
     error IndexOutOfBounds();
 
     /// @inheritdoc IBuilderRegistry
+    /// @dev A re-registration (same pubkey, new fqdn) overwrites the stored FQDN
+    /// and emits `BuilderRegistered` — there is no separate update event.
     function registerBuilder(bytes calldata pubkey, string calldata fqdn, bytes32 nonce, bytes calldata signature)
         external
     {
         if (pubkey.length != 48) revert InvalidPubkeyLength(pubkey.length);
-        if (bytes(fqdn).length == 0) revert EmptyFQDN();
+        uint256 fqdnLen = bytes(fqdn).length;
+        if (fqdnLen == 0) revert EmptyFQDN();
+        if (fqdnLen > MAX_FQDN_LENGTH) revert FQDNTooLong(fqdnLen);
         if (signature.length != 192 && signature.length != 256) revert InvalidSignatureLength(signature.length);
 
         bytes32 pkHash = keccak256(pubkey);
@@ -51,7 +60,8 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
             revert SignatureVerificationFailed();
         }
 
-        // Add or update
+        // Add or update. Update path reuses BuilderRegistered rather than emitting
+        // a distinct event — consumers should treat BuilderRegistered as an upsert.
         uint256 idx = _indexByPubkeyHash[pkHash];
         if (idx == 0) {
             _builders.push(BuilderRecord({pubkey: pubkey, fqdn: fqdn}));
@@ -70,6 +80,10 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
 
         bytes32 pkHash = keccak256(pubkey);
 
+        // Check registration before BLS verify so unregistered-pubkey calls fail cheaply.
+        uint256 idx = _indexByPubkeyHash[pkHash];
+        if (idx == 0) revert NotRegistered();
+
         if (_usedNonces[pkHash][nonce]) revert NonceAlreadyUsed();
         _usedNonces[pkHash][nonce] = true;
 
@@ -78,9 +92,6 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
         if (!BLS12381.verifySignature(pubkey, message, signature)) {
             revert SignatureVerificationFailed();
         }
-
-        uint256 idx = _indexByPubkeyHash[pkHash];
-        if (idx == 0) revert NotRegistered();
 
         // Swap-and-pop removal to avoid gaps
         uint256 lastIdx = _builders.length;
