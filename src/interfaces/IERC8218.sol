@@ -32,12 +32,8 @@ interface IBuilderRegistry {
     /// @param fqdn The FQDN to associate with the builder.
     /// @param nonce A pubkey-scoped nonce preventing replay.
     /// @param signature BLS12-381 signature (G2 point) over the request.
-    function registerBuilder(
-        bytes calldata pubkey,
-        string calldata fqdn,
-        bytes32 nonce,
-        bytes calldata signature
-    ) external;
+    function registerBuilder(bytes calldata pubkey, string calldata fqdn, bytes32 nonce, bytes calldata signature)
+        external;
 
     /// @notice Deregister a previously registered builder.
     /// @dev Reverts if `pubkey` is not currently registered, the signature does
@@ -46,11 +42,7 @@ interface IBuilderRegistry {
     /// @param pubkey 48-byte BLS12-381 compressed G1 pubkey.
     /// @param nonce A pubkey-scoped nonce preventing replay.
     /// @param signature BLS12-381 signature (G2 point) over the request.
-    function deregisterBuilder(
-        bytes calldata pubkey,
-        bytes32 nonce,
-        bytes calldata signature
-    ) external;
+    function deregisterBuilder(bytes calldata pubkey, bytes32 nonce, bytes calldata signature) external;
 }
 
 /// @title IBuilderList

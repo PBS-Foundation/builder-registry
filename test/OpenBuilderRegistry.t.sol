@@ -92,9 +92,7 @@ contract OpenBuilderRegistry_ValidationTest is Test {
         badLengths[5] = 257;
 
         for (uint256 i = 0; i < badLengths.length; i++) {
-            vm.expectRevert(
-                abi.encodeWithSelector(OpenBuilderRegistry.InvalidSignatureLength.selector, badLengths[i])
-            );
+            vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.InvalidSignatureLength.selector, badLengths[i]));
             registry.registerBuilder(validPubkey, "builder.example.com", bytes32(0), new bytes(badLengths[i]));
         }
     }
@@ -338,10 +336,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     /// @dev Call the Python signing script in deregister mode via FFI.
-    function _signDeregisterFFI(bytes32 _nonce)
-        internal
-        returns (bytes memory pubkey, bytes memory signature)
-    {
+    function _signDeregisterFFI(bytes32 _nonce) internal returns (bytes memory pubkey, bytes memory signature) {
         string[] memory cmd = new string[](5);
         cmd[0] = "python3";
         cmd[1] = "script/bls_sign.py";

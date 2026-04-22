@@ -35,7 +35,8 @@ contract BLS12381_G1DecompressTest is Test {
     /// with compression flag (0x80) set. Since G1_Y < p-G1_Y, sort flag is 0.
     function test_decompressGenerator() public view {
         // G1 generator compressed: 0x97... (0x80 | 0x17 in first byte)
-        bytes memory compressed = hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+        bytes memory compressed =
+            hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
         bytes memory result = wrapper.g1Decompress(compressed);
         assertEq(result.length, 128);
 
@@ -60,7 +61,8 @@ contract BLS12381_G1DecompressTest is Test {
     /// @dev Decompress with sort flag set — should return p-y.
     function test_decompressGeneratorWithSortFlag() public view {
         // Same as generator but with sort flag (0x20) set: 0xB7...
-        bytes memory compressed = hex"b7f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+        bytes memory compressed =
+            hex"b7f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
         bytes memory result = wrapper.g1Decompress(compressed);
 
         uint256 y_hi;
@@ -124,7 +126,8 @@ contract BLS12381_HashToCurveTest is Test {
 
     /// @dev Verify hashToCurveG2 produces a valid 256-byte G2 point using real precompiles.
     function test_hashToCurveG2_returnsValidG2Point() public view {
-        bytes memory message = abi.encode(uint256(31337), address(0), "test", "builder.example.com", bytes32(uint256(1)));
+        bytes memory message =
+            abi.encode(uint256(31337), address(0), "test", "builder.example.com", bytes32(uint256(1)));
         bytes memory result = wrapper.hashToCurveG2(message);
         assertEq(result.length, 256, "should return 256-byte G2 point");
     }
@@ -207,10 +210,7 @@ contract BLS12381_FuzzTest is Test {
     }
 
     /// @dev Different messages should (almost certainly) produce different G2 points.
-    function testFuzz_hashToCurveG2_collisionResistance(
-        bytes calldata msg1,
-        bytes calldata msg2
-    ) public view {
+    function testFuzz_hashToCurveG2_collisionResistance(bytes calldata msg1, bytes calldata msg2) public view {
         vm.assume(keccak256(msg1) != keccak256(msg2));
         bytes memory a = wrapper.hashToCurveG2(msg1);
         bytes memory b = wrapper.hashToCurveG2(msg2);
@@ -276,7 +276,8 @@ contract BLS12381_ConstantsTest is Test {
     /// (g1Decompress checks this internally).
     function test_g1GeneratorOnCurve() public {
         BLS12381Wrapper wrapper = new BLS12381Wrapper();
-        bytes memory compressed = hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
+        bytes memory compressed =
+            hex"97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb";
         bytes memory result = wrapper.g1Decompress(compressed);
 
         // If g1Decompress didn't revert, the point is on the curve (y² == x³+4 verified internally).
