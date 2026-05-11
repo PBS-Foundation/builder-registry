@@ -1,21 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BuilderRecord, IBuilderList} from "./interfaces/IERC8218.sol";
+import {BuilderRecord} from "./interfaces/IERC8218.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /// @title PermissionedBuilderRegistry
-/// @notice Permissioned counterpart to `OpenBuilderRegistry`.
-/// Builders are listed through owner-approved curators instead of self-registering
+/// @notice Permissioned counterpart to `OpenBuilderRegistry` where the contract
+/// owner curates a single builder list instead of builders self-registering
 /// with BLS signatures.
-contract PermissionedBuilderRegistry is IBuilderList {
+contract PermissionedBuilderRegistry is Ownable {
     /// @notice Maximum FQDN length in bytes (RFC 1035 §2.3.4).
     uint256 public constant MAX_FQDN_LENGTH = 253;
-
-    /// @notice Contract owner, expected to be a multisig or governance address.
-    address public owner;
-
-    /// @notice Curators that are allowed to manage the builder list.
-    mapping(address => bool) public curators;
 
     /// @notice Ordered list of builder records.
     BuilderRecord[] internal _builders;
@@ -23,60 +18,25 @@ contract PermissionedBuilderRegistry is IBuilderList {
     /// @notice Pubkey hash to 1-based index in `_builders` (0 means not registered).
     mapping(bytes32 => uint256) internal _indexByPubkeyHash;
 
-    event OwnerChanged(address indexed oldOwner, address indexed newOwner);
-    event CuratorRegistered(address indexed curator);
-    event CuratorUnregistered(address indexed curator);
-    event BuilderRegistered(bytes pubkey, string fqdn, address indexed curator);
-    event BuilderDeregistered(bytes pubkey, address indexed curator);
+    event BuilderRegistered(bytes pubkey, string fqdn);
+    event BuilderDeregistered(bytes pubkey);
 
-    error NotOwner();
-    error NotCurator();
-    error ZeroAddress();
     error InvalidPubkeyLength(uint256 length);
     error EmptyFQDN();
     error FQDNTooLong(uint256 length);
-    error AlreadyCurator();
     error NotRegistered();
     error IndexOutOfBounds();
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
-    }
-
-    modifier onlyCurator() {
-        if (!curators[msg.sender]) revert NotCurator();
-        _;
-    }
-
-    constructor() {
-        owner = msg.sender;
-        emit OwnerChanged(address(0), msg.sender);
-    }
+    constructor() Ownable(msg.sender) {}
 
     function setOwner(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert ZeroAddress();
-        emit OwnerChanged(owner, newOwner);
-        owner = newOwner;
-    }
-
-    function registerCurator(address curator) external onlyOwner {
-        if (curator == address(0)) revert ZeroAddress();
-        if (curators[curator]) revert AlreadyCurator();
-        curators[curator] = true;
-        emit CuratorRegistered(curator);
-    }
-
-    function unregisterCurator(address curator) external onlyOwner {
-        if (!curators[curator]) revert NotCurator();
-        delete curators[curator];
-        emit CuratorUnregistered(curator);
+        transferOwnership(newOwner);
     }
 
     /// @notice Register a new builder or update an existing builder's FQDN.
-    /// @dev Permissioned variant of ERC-8218 registration: a curator writes the
+    /// @dev Permissioned variant of ERC-8218 registration: the contract owner writes the
     /// builder record directly instead of verifying a BLS signature from the builder.
-    function registerBuilder(bytes calldata pubkey, string calldata fqdn) external onlyCurator {
+    function registerBuilder(bytes calldata pubkey, string calldata fqdn) external onlyOwner {
         if (pubkey.length != 48) revert InvalidPubkeyLength(pubkey.length);
         uint256 fqdnLen = bytes(fqdn).length;
         if (fqdnLen == 0) revert EmptyFQDN();
@@ -92,11 +52,11 @@ contract PermissionedBuilderRegistry is IBuilderList {
             _builders[idx - 1].fqdn = fqdn;
         }
 
-        emit BuilderRegistered(pubkey, fqdn, msg.sender);
+        emit BuilderRegistered(pubkey, fqdn);
     }
 
     /// @notice Deregister a previously listed builder.
-    function deregisterBuilder(bytes calldata pubkey) external onlyCurator {
+    function deregisterBuilder(bytes calldata pubkey) external onlyOwner {
         if (pubkey.length != 48) revert InvalidPubkeyLength(pubkey.length);
 
         bytes32 pkHash = keccak256(pubkey);
@@ -112,7 +72,7 @@ contract PermissionedBuilderRegistry is IBuilderList {
         _builders.pop();
         delete _indexByPubkeyHash[pkHash];
 
-        emit BuilderDeregistered(pubkey, msg.sender);
+        emit BuilderDeregistered(pubkey);
     }
 
     /// @notice Check whether a builder pubkey is currently listed.
@@ -120,29 +80,11 @@ contract PermissionedBuilderRegistry is IBuilderList {
         return _indexByPubkeyHash[keccak256(pubkey)] != 0;
     }
 
-    /// @inheritdoc IBuilderList
-    /// @dev `listId` is ignored because this contract exposes a single global list.
-    function builderCount(
-        uint256 /* listId */
-    )
-        external
-        view
-        returns (uint256)
-    {
+    function builderCount() external view returns (uint256) {
         return _builders.length;
     }
 
-    /// @inheritdoc IBuilderList
-    /// @dev `listId` is ignored because this contract exposes a single global list.
-    function getBuilderAtIndex(
-        uint256,
-        /* listId */
-        uint256 index
-    )
-        external
-        view
-        returns (BuilderRecord memory)
-    {
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory) {
         if (index >= _builders.length) revert IndexOutOfBounds();
         return _builders[index];
     }
