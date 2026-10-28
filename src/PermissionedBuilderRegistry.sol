@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {BuilderRecord} from "./interfaces/IERC8218.sol";
+import {BuilderRecord, IBuilderList} from "./interfaces/IERC8218.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 /// @title PermissionedBuilderRegistry
 /// @notice Permissioned counterpart to `OpenBuilderRegistry` where the contract
 /// owner curates a single builder list instead of builders self-registering
 /// with BLS signatures.
-contract PermissionedBuilderRegistry is Ownable {
+contract PermissionedBuilderRegistry is Ownable, IBuilderList {
     /// @notice Maximum FQDN length in bytes (RFC 1035 §2.3.4).
     uint256 public constant MAX_FQDN_LENGTH = 253;
 

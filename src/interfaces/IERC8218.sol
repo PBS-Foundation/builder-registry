@@ -48,15 +48,13 @@ interface IBuilderRegistry {
 /// @title IBuilderList
 /// @notice ERC-8218 read interface for enumerating registered builders.
 interface IBuilderList {
-    /// @notice Total number of builders in the given list.
-    /// @param listId Reserved for implementations that expose multiple lists.
+    /// @notice Total number of builders in the list.
     /// @return The number of builders currently registered.
-    function builderCount(uint256 listId) external view returns (uint256);
+    function builderCount() external view returns (uint256);
 
-    /// @notice Return the builder at `index` in the given list.
-    /// @dev Reverts when `index >= builderCount(listId)`.
-    /// @param listId Reserved for implementations that expose multiple lists.
+    /// @notice Return the builder at `index` in the list.
+    /// @dev Reverts when `index >= builderCount()`.
     /// @param index Zero-based index into the list.
     /// @return The builder record at that position.
-    function getBuilderAtIndex(uint256 listId, uint256 index) external view returns (BuilderRecord memory);
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory);
 }

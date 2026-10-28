@@ -107,26 +107,12 @@ contract OpenBuilderRegistry is IBuilderRegistry, IBuilderList {
     }
 
     /// @inheritdoc IBuilderList
-    function builderCount(
-        uint256 /* listId */
-    )
-        external
-        view
-        returns (uint256)
-    {
+    function builderCount() external view returns (uint256) {
         return _builders.length;
     }
 
     /// @inheritdoc IBuilderList
-    function getBuilderAtIndex(
-        uint256,
-        /* listId */
-        uint256 index
-    )
-        external
-        view
-        returns (BuilderRecord memory)
-    {
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory) {
         if (index >= _builders.length) revert IndexOutOfBounds();
         return _builders[index];
     }

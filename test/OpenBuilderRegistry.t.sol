@@ -130,82 +130,69 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
     }
 
     function test_builderCount_empty() public view {
-        assertEq(registry.builderCount(0), 0);
+        assertEq(registry.builderCount(), 0);
     }
 
     function test_builderCount_afterInserts() public {
         registry.directInsert(pk1, "a.example.com");
         registry.directInsert(pk2, "b.example.com");
-        assertEq(registry.builderCount(0), 2);
-    }
-
-    function test_builderCount_ignoresListId() public {
-        registry.directInsert(pk1, "a.example.com");
-        assertEq(registry.builderCount(0), 1);
-        assertEq(registry.builderCount(42), 1);
-        assertEq(registry.builderCount(type(uint256).max), 1);
+        assertEq(registry.builderCount(), 2);
     }
 
     function test_getBuilderAtIndex_returnsCorrectRecord() public {
         registry.directInsert(pk1, "a.example.com");
         registry.directInsert(pk2, "b.example.com");
 
-        BuilderRecord memory r0 = registry.getBuilderAtIndex(0, 0);
+        BuilderRecord memory r0 = registry.getBuilderAtIndex(0);
         assertEq(r0.pubkey, pk1);
         assertEq(r0.fqdn, "a.example.com");
 
-        BuilderRecord memory r1 = registry.getBuilderAtIndex(0, 1);
+        BuilderRecord memory r1 = registry.getBuilderAtIndex(1);
         assertEq(r1.pubkey, pk2);
         assertEq(r1.fqdn, "b.example.com");
     }
 
-    function test_getBuilderAtIndex_ignoresListId() public {
-        registry.directInsert(pk1, "a.example.com");
-        BuilderRecord memory r = registry.getBuilderAtIndex(999, 0);
-        assertEq(r.pubkey, pk1);
-    }
-
     function test_revert_getBuilderAtIndex_outOfBounds() public {
         vm.expectRevert(OpenBuilderRegistry.IndexOutOfBounds.selector);
-        registry.getBuilderAtIndex(0, 0);
+        registry.getBuilderAtIndex(0);
     }
 
     function test_revert_getBuilderAtIndex_exactBoundary() public {
         registry.directInsert(pk1, "a.example.com");
         vm.expectRevert(OpenBuilderRegistry.IndexOutOfBounds.selector);
-        registry.getBuilderAtIndex(0, 1);
+        registry.getBuilderAtIndex(1);
     }
 
     function test_updateExistingBuilder_fqdnChanges() public {
         registry.directInsert(pk1, "old.example.com");
-        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.builderCount(), 1);
 
         registry.directInsert(pk1, "new.example.com");
-        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.builderCount(), 1);
 
-        BuilderRecord memory r = registry.getBuilderAtIndex(0, 0);
+        BuilderRecord memory r = registry.getBuilderAtIndex(0);
         assertEq(r.fqdn, "new.example.com");
     }
 
     function test_directRemove_single() public {
         registry.directInsert(pk1, "a.example.com");
-        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.builderCount(), 1);
 
         registry.directRemove(pk1);
-        assertEq(registry.builderCount(0), 0);
+        assertEq(registry.builderCount(), 0);
     }
 
     function test_directRemove_swapAndPop() public {
         registry.directInsert(pk1, "first.example.com");
         registry.directInsert(pk2, "second.example.com");
         registry.directInsert(pk3, "third.example.com");
-        assertEq(registry.builderCount(0), 3);
+        assertEq(registry.builderCount(), 3);
 
         // Remove pk1 (index 0) — pk3 should swap into its place
         registry.directRemove(pk1);
-        assertEq(registry.builderCount(0), 2);
-        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "third.example.com");
-        assertEq(registry.getBuilderAtIndex(0, 1).fqdn, "second.example.com");
+        assertEq(registry.builderCount(), 2);
+        assertEq(registry.getBuilderAtIndex(0).fqdn, "third.example.com");
+        assertEq(registry.getBuilderAtIndex(1).fqdn, "second.example.com");
     }
 
     function test_directRemove_last() public {
@@ -214,18 +201,18 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
 
         // Remove last element — no swap needed
         registry.directRemove(pk2);
-        assertEq(registry.builderCount(0), 1);
-        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "first.example.com");
+        assertEq(registry.builderCount(), 1);
+        assertEq(registry.getBuilderAtIndex(0).fqdn, "first.example.com");
     }
 
     function test_directRemove_thenReinsert() public {
         registry.directInsert(pk1, "a.example.com");
         registry.directRemove(pk1);
-        assertEq(registry.builderCount(0), 0);
+        assertEq(registry.builderCount(), 0);
 
         registry.directInsert(pk1, "b.example.com");
-        assertEq(registry.builderCount(0), 1);
-        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "b.example.com");
+        assertEq(registry.builderCount(), 1);
+        assertEq(registry.getBuilderAtIndex(0).fqdn, "b.example.com");
     }
 
     function test_multipleBuilders_orderPreserved() public {
@@ -233,10 +220,10 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
         registry.directInsert(pk2, "second.example.com");
         registry.directInsert(pk3, "third.example.com");
 
-        assertEq(registry.builderCount(0), 3);
-        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, "first.example.com");
-        assertEq(registry.getBuilderAtIndex(0, 1).fqdn, "second.example.com");
-        assertEq(registry.getBuilderAtIndex(0, 2).fqdn, "third.example.com");
+        assertEq(registry.builderCount(), 3);
+        assertEq(registry.getBuilderAtIndex(0).fqdn, "first.example.com");
+        assertEq(registry.getBuilderAtIndex(1).fqdn, "second.example.com");
+        assertEq(registry.getBuilderAtIndex(2).fqdn, "third.example.com");
     }
 }
 
@@ -319,8 +306,8 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
 
         registry.registerBuilder(pubkey, fqdn, nonce, signature);
 
-        assertEq(registry.builderCount(0), 1);
-        BuilderRecord memory r = registry.getBuilderAtIndex(0, 0);
+        assertEq(registry.builderCount(), 1);
+        BuilderRecord memory r = registry.getBuilderAtIndex(0);
         assertEq(r.pubkey, pubkey);
         assertEq(r.fqdn, fqdn);
     }
@@ -331,8 +318,8 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
 
         registry.registerBuilder(pubkey, fqdn, nonce, sig192);
 
-        assertEq(registry.builderCount(0), 1);
-        assertEq(registry.getBuilderAtIndex(0, 0).fqdn, fqdn);
+        assertEq(registry.builderCount(), 1);
+        assertEq(registry.getBuilderAtIndex(0).fqdn, fqdn);
     }
 
     /// @dev Call the Python signing script in deregister mode via FFI.
@@ -376,7 +363,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
         // First register
         (bytes memory pubkey, bytes memory regSig) = _signFFI(fqdn, nonce);
         registry.registerBuilder(pubkey, fqdn, nonce, regSig);
-        assertEq(registry.builderCount(0), 1);
+        assertEq(registry.builderCount(), 1);
 
         // Then deregister with a different nonce
         bytes32 deregNonce = bytes32(uint256(2));
@@ -386,7 +373,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
         emit IBuilderRegistry.BuilderDeregistered(pubkey, deregNonce);
 
         registry.deregisterBuilder(pubkey, deregNonce, deregSig);
-        assertEq(registry.builderCount(0), 0);
+        assertEq(registry.builderCount(), 0);
     }
 
     function test_revert_deregisterBuilder_notRegistered() public {
