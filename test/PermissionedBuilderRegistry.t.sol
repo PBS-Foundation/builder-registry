@@ -2,8 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
-import {BuilderRecord} from "../src/interfaces/IERC8218.sol";
-import {PermissionedBuilderRegistry} from "../src/PermissionedBuilderRegistry.sol";
+import {BuilderRecord, IBuilderList} from "../src/interfaces/IERC8218.sol";
+import {BuilderListBase} from "../src/BuilderListBase.sol";
+import {
+    PermissionedBuilderRegistry
+} from "../src/PermissionedBuilderRegistry.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract PermissionedBuilderRegistryTest is Test {
@@ -21,44 +24,67 @@ contract PermissionedBuilderRegistryTest is Test {
         registry = new PermissionedBuilderRegistry();
 
         pk1 = new bytes(48);
-        pk1[0] = 0x01;
+        pk1[0] = 0x81;
         pk2 = new bytes(48);
-        pk2[0] = 0x02;
+        pk2[0] = 0x82;
         pk3 = new bytes(48);
-        pk3[0] = 0x03;
+        pk3[0] = 0x83;
     }
 
     function testOwnerCanRegisterBuilder() public {
+        vm.expectEmit(true, false, false, true);
+        emit IBuilderList.BuilderRegistered(
+            keccak256(pk1),
+            pk1,
+            "https://builder1.example.com",
+            ""
+        );
+
         vm.prank(owner);
-        registry.registerBuilder(pk1, "builder1.example.com");
+        registry.registerBuilder(pk1, "https://builder1.example.com", "");
 
         assertTrue(registry.isBuilderRegistered(pk1));
         assertEq(registry.builderCount(), 1);
 
         BuilderRecord memory record = registry.getBuilderAtIndex(0);
         assertEq(record.pubkey, pk1);
-        assertEq(record.fqdn, "builder1.example.com");
+        assertEq(record.url, "https://builder1.example.com");
+        assertEq(record.updatedAt, uint64(block.timestamp));
     }
 
     function testNonOwnerCannotRegisterBuilder() public {
         vm.prank(outsider);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, outsider));
-        registry.registerBuilder(pk1, "builder1.example.com");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                outsider
+            )
+        );
+        registry.registerBuilder(pk1, "https://builder1.example.com", "");
     }
 
-    function testOwnerCanUpdateBuilderFqdn() public {
+    function testOwnerCanUpdateBuilderRecord() public {
         vm.startPrank(owner);
-        registry.registerBuilder(pk1, "old.example.com");
-        registry.registerBuilder(pk1, "new.example.com");
+        registry.registerBuilder(pk1, "https://old.example.com", "");
+        registry.registerBuilder(
+            pk1,
+            "https://new.example.com:18550",
+            "custom"
+        );
         vm.stopPrank();
 
         assertEq(registry.builderCount(), 1);
-        assertEq(registry.getBuilderAtIndex(0).fqdn, "new.example.com");
+        BuilderRecord memory r = registry.getBuilder(pk1);
+        assertEq(r.url, "https://new.example.com:18550");
+        assertEq(r.authData, "custom");
     }
 
     function testOwnerCanDeregisterBuilder() public {
         vm.startPrank(owner);
-        registry.registerBuilder(pk1, "builder1.example.com");
+        registry.registerBuilder(pk1, "https://builder1.example.com", "");
+
+        vm.expectEmit(true, false, false, true);
+        emit IBuilderList.BuilderDeregistered(keccak256(pk1), pk1);
         registry.deregisterBuilder(pk1);
         vm.stopPrank();
 
@@ -68,50 +94,88 @@ contract PermissionedBuilderRegistryTest is Test {
 
     function testNonOwnerCannotDeregisterBuilder() public {
         vm.prank(owner);
-        registry.registerBuilder(pk1, "builder1.example.com");
+        registry.registerBuilder(pk1, "https://builder1.example.com", "");
 
         vm.prank(outsider);
-        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, outsider));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Ownable.OwnableUnauthorizedAccount.selector,
+                outsider
+            )
+        );
         registry.deregisterBuilder(pk1);
     }
 
     function testDeregisterUsesSwapAndPop() public {
         vm.startPrank(owner);
-        registry.registerBuilder(pk1, "first.example.com");
-        registry.registerBuilder(pk2, "second.example.com");
-        registry.registerBuilder(pk3, "third.example.com");
+        registry.registerBuilder(pk1, "https://first.example.com", "");
+        registry.registerBuilder(pk2, "https://second.example.com", "");
+        registry.registerBuilder(pk3, "https://third.example.com", "");
         registry.deregisterBuilder(pk1);
         vm.stopPrank();
 
         assertEq(registry.builderCount(), 2);
-        assertEq(registry.getBuilderAtIndex(0).fqdn, "third.example.com");
-        assertEq(registry.getBuilderAtIndex(1).fqdn, "second.example.com");
+        assertEq(
+            registry.getBuilderAtIndex(0).url,
+            "https://third.example.com"
+        );
+        assertEq(
+            registry.getBuilderAtIndex(1).url,
+            "https://second.example.com"
+        );
+        assertEq(registry.getBuilders(0, 10).length, 2);
     }
 
     function testRevertInvalidPubkeyLengthOnRegister() public {
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(PermissionedBuilderRegistry.InvalidPubkeyLength.selector, 47));
-        registry.registerBuilder(new bytes(47), "builder1.example.com");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                BuilderListBase.InvalidPubkeyLength.selector,
+                47
+            )
+        );
+        registry.registerBuilder(
+            new bytes(47),
+            "https://builder1.example.com",
+            ""
+        );
     }
 
-    function testRevertEmptyFqdnOnRegister() public {
+    function testRevertInfinityPubkeyOnRegister() public {
+        bytes memory pk = new bytes(48);
+        pk[0] = 0xc0;
         vm.prank(owner);
-        vm.expectRevert(PermissionedBuilderRegistry.EmptyFQDN.selector);
-        registry.registerBuilder(pk1, "");
+        vm.expectRevert(BuilderListBase.InvalidPubkeyEncoding.selector);
+        registry.registerBuilder(pk, "https://builder1.example.com", "");
+    }
+
+    function testRevertEmptyUrlOnRegister() public {
+        vm.prank(owner);
+        vm.expectRevert(BuilderListBase.EmptyURL.selector);
+        registry.registerBuilder(pk1, "", "");
+    }
+
+    function testRevertBareHostnameOnRegister() public {
+        vm.prank(owner);
+        vm.expectRevert(BuilderListBase.InvalidURL.selector);
+        registry.registerBuilder(pk1, "builder1.example.com", "");
     }
 
     function testRevertNotRegisteredOnDeregister() public {
         vm.prank(owner);
-        vm.expectRevert(PermissionedBuilderRegistry.NotRegistered.selector);
+        vm.expectRevert(BuilderListBase.NotRegistered.selector);
         registry.deregisterBuilder(pk1);
     }
 
-    function testBuilderCount() public {
-        vm.startPrank(owner);
-        registry.registerBuilder(pk1, "builder1.example.com");
-        registry.registerBuilder(pk2, "builder2.example.com");
-        vm.stopPrank();
+    function testTwoStepOwnershipTransfer() public {
+        vm.prank(owner);
+        registry.transferOwnership(outsider);
+        // Ownership does not move until accepted.
+        assertEq(registry.owner(), owner);
+        assertEq(registry.pendingOwner(), outsider);
 
-        assertEq(registry.builderCount(), 2);
+        vm.prank(outsider);
+        registry.acceptOwnership();
+        assertEq(registry.owner(), outsider);
     }
 }
