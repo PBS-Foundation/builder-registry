@@ -9,18 +9,11 @@ import {OpenBuilderRegistry} from "../src/OpenBuilderRegistry.sol";
 /// @dev Harness that exposes direct writes for unit testing the list
 /// interface without needing valid BLS signatures.
 contract OpenBuilderRegistryHarness is OpenBuilderRegistry {
-    function directInsert(
-        bytes calldata pubkey,
-        string calldata url,
-        bytes calldata authData
-    ) external {
+    function directInsert(bytes calldata pubkey, string calldata url, bytes calldata authData) external {
         _upsert(keccak256(pubkey), pubkey, url, authData);
     }
 
-    function checkEndpoint(
-        string calldata url,
-        bytes calldata authData
-    ) external pure {
+    function checkEndpoint(string calldata url, bytes calldata authData) external pure {
         _validateEndpoint(url, authData);
     }
 
@@ -43,10 +36,7 @@ contract OpenBuilderRegistry_ValidationTest is Test {
         validPubkey[0] = 0x80; // compression flag
     }
 
-    function _repeat(
-        bytes1 c,
-        uint256 n
-    ) internal pure returns (bytes memory out) {
+    function _repeat(bytes1 c, uint256 n) internal pure returns (bytes memory out) {
         out = new bytes(n);
         for (uint256 i = 0; i < n; i++) {
             out[i] = c;
@@ -54,22 +44,12 @@ contract OpenBuilderRegistry_ValidationTest is Test {
     }
 
     function test_revert_InvalidPubkeyLength_tooShort() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BuilderListBase.InvalidPubkeyLength.selector,
-                47
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(BuilderListBase.InvalidPubkeyLength.selector, 47));
         registry.registerBuilder(new bytes(47), URL, "", 1, validSignature);
     }
 
     function test_revert_InvalidPubkeyLength_tooLong() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BuilderListBase.InvalidPubkeyLength.selector,
-                49
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(BuilderListBase.InvalidPubkeyLength.selector, 49));
         registry.registerBuilder(new bytes(49), URL, "", 1, validSignature);
     }
 
@@ -93,26 +73,16 @@ contract OpenBuilderRegistry_ValidationTest is Test {
 
     function test_revert_URLTooLong() public {
         uint256 tooLong = registry.MAX_URL_LENGTH() + 1;
-        string memory url = string.concat(
-            "https://",
-            string(_repeat("a", tooLong - 8))
-        );
-        vm.expectRevert(
-            abi.encodeWithSelector(BuilderListBase.URLTooLong.selector, tooLong)
-        );
+        string memory url = string.concat("https://", string(_repeat("a", tooLong - 8)));
+        vm.expectRevert(abi.encodeWithSelector(BuilderListBase.URLTooLong.selector, tooLong));
         registry.registerBuilder(validPubkey, url, "", 1, validSignature);
     }
 
     function test_accept_URLAtMaxLength() public {
         uint256 maxLen = registry.MAX_URL_LENGTH();
-        string memory url = string.concat(
-            "https://",
-            string(_repeat("a", maxLen - 8))
-        );
+        string memory url = string.concat("https://", string(_repeat("a", maxLen - 8)));
         // Passes validation and fails later at BLS verification.
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, url, "", 1, validSignature);
     }
 
@@ -135,13 +105,7 @@ contract OpenBuilderRegistry_ValidationTest is Test {
         ];
         for (uint256 i = 0; i < bad.length; i++) {
             vm.expectRevert(BuilderListBase.InvalidURL.selector);
-            registry.registerBuilder(
-                validPubkey,
-                bad[i],
-                "",
-                1,
-                validSignature
-            );
+            registry.registerBuilder(validPubkey, bad[i], "", 1, validSignature);
         }
     }
 
@@ -161,26 +125,13 @@ contract OpenBuilderRegistry_ValidationTest is Test {
 
     function test_revert_AuthDataTooLong() public {
         uint256 tooLong = registry.MAX_AUTH_DATA_LENGTH() + 1;
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BuilderListBase.AuthDataTooLong.selector,
-                tooLong
-            )
-        );
-        registry.registerBuilder(
-            validPubkey,
-            URL,
-            new bytes(tooLong),
-            1,
-            validSignature
-        );
+        vm.expectRevert(abi.encodeWithSelector(BuilderListBase.AuthDataTooLong.selector, tooLong));
+        registry.registerBuilder(validPubkey, URL, new bytes(tooLong), 1, validSignature);
     }
 
     function test_accept_AuthDataAtMaxLength() public {
         bytes memory authData = new bytes(registry.MAX_AUTH_DATA_LENGTH());
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, URL, authData, 1, validSignature);
     }
 
@@ -194,44 +145,23 @@ contract OpenBuilderRegistry_ValidationTest is Test {
         badLengths[5] = 257;
 
         for (uint256 i = 0; i < badLengths.length; i++) {
-            vm.expectRevert(
-                abi.encodeWithSelector(
-                    OpenBuilderRegistry.InvalidSignatureLength.selector,
-                    badLengths[i]
-                )
-            );
-            registry.registerBuilder(
-                validPubkey,
-                URL,
-                "",
-                1,
-                new bytes(badLengths[i])
-            );
+            vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.InvalidSignatureLength.selector, badLengths[i]));
+            registry.registerBuilder(validPubkey, URL, "", 1, new bytes(badLengths[i]));
         }
     }
 
     function test_accept_SignatureLength_192() public {
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, URL, "", 1, new bytes(192));
     }
 
     function test_accept_SignatureLength_256() public {
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(validPubkey, URL, "", 1, validSignature);
     }
 
     function test_revert_StaleNonce_zero() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OpenBuilderRegistry.StaleNonce.selector,
-                0,
-                0
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.StaleNonce.selector, 0, 0));
         registry.registerBuilder(validPubkey, URL, "", 0, validSignature);
     }
 
@@ -273,11 +203,7 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
     function test_getBuilderAtIndex_returnsCorrectRecord() public {
         vm.warp(1_700_000_000);
         registry.directInsert(pk1, "https://a.example.com", "");
-        registry.directInsert(
-            pk2,
-            "https://b.example.com:18550",
-            "custom-auth"
-        );
+        registry.directInsert(pk2, "https://b.example.com:18550", "custom-auth");
 
         BuilderRecord memory r0 = registry.getBuilderAtIndex(0);
         assertEq(r0.pubkey, pk1);
@@ -339,38 +265,22 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
         assertEq(registry.getBuilders(3, 5).length, 0);
         assertEq(registry.getBuilders(0, 0).length, 0);
         assertEq(registry.getBuilders(1, type(uint256).max).length, 2);
-        assertEq(
-            registry.getBuilders(type(uint256).max, type(uint256).max).length,
-            0
-        );
+        assertEq(registry.getBuilders(type(uint256).max, type(uint256).max).length, 0);
     }
 
-    function testFuzz_getBuilders_matchesIndexAccess(
-        uint8 n,
-        uint8 offset,
-        uint8 limit
-    ) public {
+    function testFuzz_getBuilders_matchesIndexAccess(uint8 n, uint8 offset, uint8 limit) public {
         n = uint8(bound(n, 0, 20));
         for (uint256 i = 0; i < n; i++) {
             bytes memory pk = new bytes(48);
             pk[0] = 0x80;
             pk[47] = bytes1(uint8(i));
-            registry.directInsert(
-                pk,
-                string.concat("https://b", vm.toString(i), ".example.com"),
-                ""
-            );
+            registry.directInsert(pk, string.concat("https://b", vm.toString(i), ".example.com"), "");
         }
         BuilderRecord[] memory page = registry.getBuilders(offset, limit);
-        uint256 expected = offset >= n
-            ? 0
-            : (n - offset < limit ? n - offset : limit);
+        uint256 expected = offset >= n ? 0 : (n - offset < limit ? n - offset : limit);
         assertEq(page.length, expected);
         for (uint256 i = 0; i < page.length; i++) {
-            assertEq(
-                page[i].pubkey,
-                registry.getBuilderAtIndex(offset + i).pubkey
-            );
+            assertEq(page[i].pubkey, registry.getBuilderAtIndex(offset + i).pubkey);
         }
     }
 
@@ -389,12 +299,7 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
 
     function test_events() public {
         vm.expectEmit(true, false, false, true);
-        emit IBuilderList.BuilderRegistered(
-            keccak256(pk1),
-            pk1,
-            "https://a.example.com",
-            "d"
-        );
+        emit IBuilderList.BuilderRegistered(keccak256(pk1), pk1, "https://a.example.com", "d");
         registry.directInsert(pk1, "https://a.example.com", "d");
 
         vm.expectEmit(true, false, false, true);
@@ -417,14 +322,8 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
         // Remove pk1 (index 0) — pk3 should swap into its place
         registry.directRemove(pk1);
         assertEq(registry.builderCount(), 2);
-        assertEq(
-            registry.getBuilderAtIndex(0).url,
-            "https://third.example.com"
-        );
-        assertEq(
-            registry.getBuilderAtIndex(1).url,
-            "https://second.example.com"
-        );
+        assertEq(registry.getBuilderAtIndex(0).url, "https://third.example.com");
+        assertEq(registry.getBuilderAtIndex(1).url, "https://second.example.com");
         // Lookup by pubkey still resolves the moved record.
         assertEq(registry.getBuilder(pk3).url, "https://third.example.com");
     }
@@ -435,10 +334,7 @@ contract OpenBuilderRegistry_BuilderListTest is Test {
 
         registry.directRemove(pk2);
         assertEq(registry.builderCount(), 1);
-        assertEq(
-            registry.getBuilderAtIndex(0).url,
-            "https://first.example.com"
-        );
+        assertEq(registry.getBuilderAtIndex(0).url, "https://first.example.com");
     }
 
     function test_directRemove_thenReinsert() public {
@@ -464,9 +360,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
         registry = new OpenBuilderRegistry();
     }
 
-    function _split(
-        bytes memory result
-    ) internal pure returns (bytes memory pubkey, bytes memory signature) {
+    function _split(bytes memory result) internal pure returns (bytes memory pubkey, bytes memory signature) {
         // Result is 304 bytes: 48-byte pubkey + 256-byte signature
         require(result.length == 304, "FFI output must be 304 bytes");
         pubkey = new bytes(48);
@@ -478,11 +372,10 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     /// @dev Call the Python signing script via FFI to get a real registration signature.
-    function _signRegisterFFI(
-        string memory _url,
-        bytes memory _authData,
-        uint64 _nonce
-    ) internal returns (bytes memory pubkey, bytes memory signature) {
+    function _signRegisterFFI(string memory _url, bytes memory _authData, uint64 _nonce)
+        internal
+        returns (bytes memory pubkey, bytes memory signature)
+    {
         string[] memory cmd = new string[](8);
         cmd[0] = "python3";
         cmd[1] = "script/bls_sign.py";
@@ -496,9 +389,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     /// @dev Call the Python signing script in deregister mode via FFI.
-    function _signDeregisterFFI(
-        uint64 _nonce
-    ) internal returns (bytes memory pubkey, bytes memory signature) {
+    function _signDeregisterFFI(uint64 _nonce) internal returns (bytes memory pubkey, bytes memory signature) {
         string[] memory cmd = new string[](6);
         cmd[0] = "python3";
         cmd[1] = "script/bls_sign.py";
@@ -512,9 +403,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     /// @dev Convert 256-byte EIP-2537 signature to 192-byte Zcash format.
     /// EIP-2537: x_c0(64) || x_c1(64) || y_c0(64) || y_c1(64)
     /// Zcash:    x_c1(48) || x_c0(48) || y_c1(48) || y_c0(48)
-    function _to192(
-        bytes memory sig256
-    ) internal pure returns (bytes memory sig192) {
+    function _to192(bytes memory sig256) internal pure returns (bytes memory sig192) {
         sig192 = new bytes(192);
         assembly {
             let src := add(sig256, 32)
@@ -527,19 +416,10 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     function test_registerBuilder_validSignature_256() public {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
 
         vm.expectEmit(true, false, false, true);
-        emit IBuilderList.BuilderRegistered(
-            keccak256(pubkey),
-            pubkey,
-            url,
-            authData
-        );
+        emit IBuilderList.BuilderRegistered(keccak256(pubkey), pubkey, url, authData);
 
         registry.registerBuilder(pubkey, url, authData, 1, signature);
 
@@ -552,104 +432,54 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     function test_registerBuilder_validSignature_192() public {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
         registry.registerBuilder(pubkey, url, authData, 1, _to192(signature));
         assertEq(registry.getBuilderAtIndex(0).url, url);
     }
 
     function test_registerBuilder_withCustomAuthData() public {
         bytes memory custom = "builder-a.shared-host.example";
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            custom,
-            1
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, custom, 1);
         registry.registerBuilder(pubkey, url, custom, 1, signature);
         assertEq(registry.getBuilder(pubkey).authData, custom);
     }
 
     function test_revert_registerBuilder_tamperedAuthData() public {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(pubkey, url, "attacker", 1, signature);
     }
 
     function test_revert_registerBuilder_tamperedNonce() public {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(pubkey, url, authData, 2, signature);
     }
 
     function test_revert_registerBuilder_replaySameNonce() public {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
         registry.registerBuilder(pubkey, url, authData, 1, signature);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OpenBuilderRegistry.StaleNonce.selector,
-                1,
-                1
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.StaleNonce.selector, 1, 1));
         registry.registerBuilder(pubkey, url, authData, 1, signature);
     }
 
     /// @dev A registration signed earlier but landing later must not roll back a newer one.
     function test_revert_registerBuilder_outOfOrderRollback() public {
         string memory oldUrl = "https://old.example.com";
-        (bytes memory pubkey, bytes memory oldSig) = _signRegisterFFI(
-            oldUrl,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory oldSig) = _signRegisterFFI(oldUrl, authData, 1);
         (, bytes memory newSig) = _signRegisterFFI(url, authData, 2);
 
         registry.registerBuilder(pubkey, url, authData, 2, newSig);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OpenBuilderRegistry.StaleNonce.selector,
-                1,
-                2
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.StaleNonce.selector, 1, 2));
         registry.registerBuilder(pubkey, oldUrl, authData, 1, oldSig);
         assertEq(registry.getBuilder(pubkey).url, url);
     }
 
     function test_registerBuilder_updateWithHigherNonce() public {
-        (bytes memory pubkey, bytes memory sig1) = _signRegisterFFI(
-            "https://old.example.com",
-            authData,
-            1
-        );
-        registry.registerBuilder(
-            pubkey,
-            "https://old.example.com",
-            authData,
-            1,
-            sig1
-        );
+        (bytes memory pubkey, bytes memory sig1) = _signRegisterFFI("https://old.example.com", authData, 1);
+        registry.registerBuilder(pubkey, "https://old.example.com", authData, 1, sig1);
 
         // Nonces need not be contiguous.
         (, bytes memory sig2) = _signRegisterFFI(url, authData, 10);
@@ -661,11 +491,7 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     function test_deregisterBuilder_validSignature() public {
-        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(url, authData, 1);
         registry.registerBuilder(pubkey, url, authData, 1, regSig);
 
         (, bytes memory deregSig) = _signDeregisterFFI(2);
@@ -681,22 +507,12 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
 
     /// @dev After deregistration the old registration signature must not re-add the builder.
     function test_revert_replayRegistrationAfterDeregister() public {
-        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(url, authData, 1);
         registry.registerBuilder(pubkey, url, authData, 1, regSig);
         (, bytes memory deregSig) = _signDeregisterFFI(2);
         registry.deregisterBuilder(pubkey, 2, deregSig);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OpenBuilderRegistry.StaleNonce.selector,
-                1,
-                2
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.StaleNonce.selector, 1, 2));
         registry.registerBuilder(pubkey, url, authData, 1, regSig);
 
         // A fresh registration with a higher nonce works.
@@ -706,21 +522,11 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
     }
 
     function test_revert_deregisterBuilder_staleNonce() public {
-        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(
-            url,
-            authData,
-            5
-        );
+        (bytes memory pubkey, bytes memory regSig) = _signRegisterFFI(url, authData, 5);
         registry.registerBuilder(pubkey, url, authData, 5, regSig);
         (, bytes memory deregSig) = _signDeregisterFFI(4);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OpenBuilderRegistry.StaleNonce.selector,
-                4,
-                5
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OpenBuilderRegistry.StaleNonce.selector, 4, 5));
         registry.deregisterBuilder(pubkey, 4, deregSig);
     }
 
@@ -730,19 +536,11 @@ contract OpenBuilderRegistry_RegistrationTest is Test {
         registry.deregisterBuilder(pubkey, 2, deregSig);
     }
 
-    function test_revert_registerBuilder_invalidSignature_doesNotConsumeNonce()
-        public
-    {
-        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(
-            url,
-            authData,
-            1
-        );
+    function test_revert_registerBuilder_invalidSignature_doesNotConsumeNonce() public {
+        (bytes memory pubkey, bytes memory signature) = _signRegisterFFI(url, authData, 1);
         signature[100] = signature[100] ^ 0xff;
 
-        vm.expectRevert(
-            OpenBuilderRegistry.SignatureVerificationFailed.selector
-        );
+        vm.expectRevert(OpenBuilderRegistry.SignatureVerificationFailed.selector);
         registry.registerBuilder(pubkey, url, authData, 1, signature);
         assertEq(registry.nonces(pubkey), 0);
     }

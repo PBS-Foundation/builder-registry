@@ -47,18 +47,13 @@ abstract contract BuilderListBase is IBuilderList {
     }
 
     /// @inheritdoc IBuilderList
-    function getBuilderAtIndex(
-        uint256 index
-    ) external view returns (BuilderRecord memory) {
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory) {
         if (index >= _builders.length) revert IndexOutOfBounds();
         return _builders[index];
     }
 
     /// @inheritdoc IBuilderList
-    function getBuilders(
-        uint256 offset,
-        uint256 limit
-    ) external view returns (BuilderRecord[] memory page) {
+    function getBuilders(uint256 offset, uint256 limit) external view returns (BuilderRecord[] memory page) {
         uint256 count = _builders.length;
         if (offset >= count) return new BuilderRecord[](0);
         uint256 end = count - offset < limit ? count : offset + limit;
@@ -69,16 +64,12 @@ abstract contract BuilderListBase is IBuilderList {
     }
 
     /// @inheritdoc IBuilderList
-    function getBuilder(
-        bytes calldata pubkey
-    ) external view returns (BuilderRecord memory) {
+    function getBuilder(bytes calldata pubkey) external view returns (BuilderRecord memory) {
         return _builders[_requireIndex(keccak256(pubkey)) - 1];
     }
 
     /// @inheritdoc IBuilderList
-    function isBuilderRegistered(
-        bytes calldata pubkey
-    ) external view returns (bool) {
+    function isBuilderRegistered(bytes calldata pubkey) external view returns (bool) {
         return _indexByPubkeyHash[keccak256(pubkey)] != 0;
     }
 
@@ -91,8 +82,9 @@ abstract contract BuilderListBase is IBuilderList {
     function _validatePubkey(bytes calldata pubkey) internal pure {
         if (pubkey.length != 48) revert InvalidPubkeyLength(pubkey.length);
         uint8 flags = uint8(pubkey[0]);
-        if (flags & 0x80 == 0 || flags & 0x40 != 0)
+        if (flags & 0x80 == 0 || flags & 0x40 != 0) {
             revert InvalidPubkeyEncoding();
+        }
     }
 
     /// @dev Validate a builder record's URL and auth data.
@@ -100,51 +92,33 @@ abstract contract BuilderListBase is IBuilderList {
     /// printable ASCII (internationalized hosts must be punycode), and contain no
     /// userinfo, query, fragment or backslash (the at-sign, question mark and hash
     /// characters are rejected anywhere after the scheme).
-    function _validateEndpoint(
-        string calldata url,
-        bytes calldata authData
-    ) internal pure {
+    function _validateEndpoint(string calldata url, bytes calldata authData) internal pure {
         bytes calldata u = bytes(url);
         uint256 len = u.length;
         if (len == 0) revert EmptyURL();
         if (len > MAX_URL_LENGTH) revert URLTooLong(len);
-        if (authData.length > MAX_AUTH_DATA_LENGTH)
+        if (authData.length > MAX_AUTH_DATA_LENGTH) {
             revert AuthDataTooLong(authData.length);
+        }
 
         // "https://" plus at least one host byte.
-        if (len <= 8 || bytes8(u[0:8]) != bytes8("https://"))
+        if (len <= 8 || bytes8(u[0:8]) != bytes8("https://")) {
             revert InvalidURL();
+        }
         if (u[8] == "/" || u[8] == ":") revert InvalidURL();
 
         for (uint256 i = 8; i < len; ++i) {
             bytes1 c = u[i];
-            if (
-                c <= 0x20 ||
-                c >= 0x7f ||
-                c == "@" ||
-                c == "?" ||
-                c == "#" ||
-                c == "\\"
-            ) revert InvalidURL();
+            if (c <= 0x20 || c >= 0x7f || c == "@" || c == "?" || c == "#" || c == "\\") revert InvalidURL();
         }
     }
 
     /// @dev Insert a new record or overwrite the existing one for `pubkey`.
-    function _upsert(
-        bytes32 pkHash,
-        bytes calldata pubkey,
-        string calldata url,
-        bytes calldata authData
-    ) internal {
+    function _upsert(bytes32 pkHash, bytes calldata pubkey, string calldata url, bytes calldata authData) internal {
         uint256 idx = _indexByPubkeyHash[pkHash];
         if (idx == 0) {
             _builders.push(
-                BuilderRecord({
-                    pubkey: pubkey,
-                    url: url,
-                    authData: authData,
-                    updatedAt: uint64(block.timestamp)
-                })
+                BuilderRecord({pubkey: pubkey, url: url, authData: authData, updatedAt: uint64(block.timestamp)})
             );
             _indexByPubkeyHash[pkHash] = _builders.length;
         } else {
@@ -157,11 +131,7 @@ abstract contract BuilderListBase is IBuilderList {
     }
 
     /// @dev Swap-and-pop removal of the record at 1-based `idx`.
-    function _remove(
-        bytes32 pkHash,
-        uint256 idx,
-        bytes calldata pubkey
-    ) internal {
+    function _remove(bytes32 pkHash, uint256 idx, bytes calldata pubkey) internal {
         uint256 lastIdx = _builders.length;
         if (idx != lastIdx) {
             BuilderRecord storage last = _builders[lastIdx - 1];

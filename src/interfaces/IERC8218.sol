@@ -45,11 +45,7 @@ interface IBuilderRegistry {
     /// @param pubkey 48-byte BLS12-381 compressed G1 pubkey.
     /// @param nonce Per-pubkey nonce; must exceed the last consumed nonce.
     /// @param signature BLS12-381 signature (G2 point) over the request.
-    function deregisterBuilder(
-        bytes calldata pubkey,
-        uint64 nonce,
-        bytes calldata signature
-    ) external;
+    function deregisterBuilder(bytes calldata pubkey, uint64 nonce, bytes calldata signature) external;
 
     /// @notice The last nonce consumed for `pubkey` (0 if none). The next signed
     /// request must use a strictly greater nonce.
@@ -63,12 +59,7 @@ interface IBuilderRegistry {
 interface IBuilderList {
     /// @notice Emitted when a builder is added or its record is updated.
     /// @param pubkeyHash `keccak256(pubkey)`, indexed for filtering.
-    event BuilderRegistered(
-        bytes32 indexed pubkeyHash,
-        bytes pubkey,
-        string url,
-        bytes authData
-    );
+    event BuilderRegistered(bytes32 indexed pubkeyHash, bytes pubkey, string url, bytes authData);
 
     /// @notice Emitted when a builder is removed from the list.
     /// @param pubkeyHash `keccak256(pubkey)`, indexed for filtering.
@@ -80,25 +71,16 @@ interface IBuilderList {
     /// @notice Return the builder at `index` in the list.
     /// @dev Reverts when `index >= builderCount()`. Indexes are enumeration positions,
     /// not stable identifiers: removal may move another record to a different index.
-    function getBuilderAtIndex(
-        uint256 index
-    ) external view returns (BuilderRecord memory);
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory);
 
     /// @notice Return up to `limit` records starting at `offset`.
     /// @dev Returns an empty array when `offset >= builderCount()`.
-    function getBuilders(
-        uint256 offset,
-        uint256 limit
-    ) external view returns (BuilderRecord[] memory);
+    function getBuilders(uint256 offset, uint256 limit) external view returns (BuilderRecord[] memory);
 
     /// @notice Return the record for `pubkey`.
     /// @dev Reverts when `pubkey` is not in the list.
-    function getBuilder(
-        bytes calldata pubkey
-    ) external view returns (BuilderRecord memory);
+    function getBuilder(bytes calldata pubkey) external view returns (BuilderRecord memory);
 
     /// @notice Whether `pubkey` is currently in the list.
-    function isBuilderRegistered(
-        bytes calldata pubkey
-    ) external view returns (bool);
+    function isBuilderRegistered(bytes calldata pubkey) external view returns (bool);
 }

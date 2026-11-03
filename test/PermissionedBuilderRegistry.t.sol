@@ -4,9 +4,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 import {BuilderRecord, IBuilderList} from "../src/interfaces/IERC8218.sol";
 import {BuilderListBase} from "../src/BuilderListBase.sol";
-import {
-    PermissionedBuilderRegistry
-} from "../src/PermissionedBuilderRegistry.sol";
+import {PermissionedBuilderRegistry} from "../src/PermissionedBuilderRegistry.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract PermissionedBuilderRegistryTest is Test {
@@ -33,12 +31,7 @@ contract PermissionedBuilderRegistryTest is Test {
 
     function testOwnerCanRegisterBuilder() public {
         vm.expectEmit(true, false, false, true);
-        emit IBuilderList.BuilderRegistered(
-            keccak256(pk1),
-            pk1,
-            "https://builder1.example.com",
-            ""
-        );
+        emit IBuilderList.BuilderRegistered(keccak256(pk1), pk1, "https://builder1.example.com", "");
 
         vm.prank(owner);
         registry.registerBuilder(pk1, "https://builder1.example.com", "");
@@ -54,23 +47,14 @@ contract PermissionedBuilderRegistryTest is Test {
 
     function testNonOwnerCannotRegisterBuilder() public {
         vm.prank(outsider);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                outsider
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, outsider));
         registry.registerBuilder(pk1, "https://builder1.example.com", "");
     }
 
     function testOwnerCanUpdateBuilderRecord() public {
         vm.startPrank(owner);
         registry.registerBuilder(pk1, "https://old.example.com", "");
-        registry.registerBuilder(
-            pk1,
-            "https://new.example.com:18550",
-            "custom"
-        );
+        registry.registerBuilder(pk1, "https://new.example.com:18550", "custom");
         vm.stopPrank();
 
         assertEq(registry.builderCount(), 1);
@@ -97,12 +81,7 @@ contract PermissionedBuilderRegistryTest is Test {
         registry.registerBuilder(pk1, "https://builder1.example.com", "");
 
         vm.prank(outsider);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Ownable.OwnableUnauthorizedAccount.selector,
-                outsider
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, outsider));
         registry.deregisterBuilder(pk1);
     }
 
@@ -115,30 +94,15 @@ contract PermissionedBuilderRegistryTest is Test {
         vm.stopPrank();
 
         assertEq(registry.builderCount(), 2);
-        assertEq(
-            registry.getBuilderAtIndex(0).url,
-            "https://third.example.com"
-        );
-        assertEq(
-            registry.getBuilderAtIndex(1).url,
-            "https://second.example.com"
-        );
+        assertEq(registry.getBuilderAtIndex(0).url, "https://third.example.com");
+        assertEq(registry.getBuilderAtIndex(1).url, "https://second.example.com");
         assertEq(registry.getBuilders(0, 10).length, 2);
     }
 
     function testRevertInvalidPubkeyLengthOnRegister() public {
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                BuilderListBase.InvalidPubkeyLength.selector,
-                47
-            )
-        );
-        registry.registerBuilder(
-            new bytes(47),
-            "https://builder1.example.com",
-            ""
-        );
+        vm.expectRevert(abi.encodeWithSelector(BuilderListBase.InvalidPubkeyLength.selector, 47));
+        registry.registerBuilder(new bytes(47), "https://builder1.example.com", "");
     }
 
     function testRevertInfinityPubkeyOnRegister() public {

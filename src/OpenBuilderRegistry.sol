@@ -37,26 +37,16 @@ contract OpenBuilderRegistry is IBuilderRegistry, BuilderListBase {
         bytes32 pkHash = keccak256(pubkey);
         _consumeNonce(pkHash, nonce);
 
-        bytes memory message = abi.encode(
-            block.chainid,
-            address(this),
-            pubkey,
-            url,
-            authData,
-            nonce
-        );
-        if (!BLS12381.verifySignature(pubkey, message, signature))
+        bytes memory message = abi.encode(block.chainid, address(this), pubkey, url, authData, nonce);
+        if (!BLS12381.verifySignature(pubkey, message, signature)) {
             revert SignatureVerificationFailed();
+        }
 
         _upsert(pkHash, pubkey, url, authData);
     }
 
     /// @inheritdoc IBuilderRegistry
-    function deregisterBuilder(
-        bytes calldata pubkey,
-        uint64 nonce,
-        bytes calldata signature
-    ) external {
+    function deregisterBuilder(bytes calldata pubkey, uint64 nonce, bytes calldata signature) external {
         _validatePubkey(pubkey);
         _validateSignatureLength(signature);
 
@@ -65,14 +55,10 @@ contract OpenBuilderRegistry is IBuilderRegistry, BuilderListBase {
         uint256 idx = _requireIndex(pkHash);
         _consumeNonce(pkHash, nonce);
 
-        bytes memory message = abi.encode(
-            block.chainid,
-            address(this),
-            pubkey,
-            nonce
-        );
-        if (!BLS12381.verifySignature(pubkey, message, signature))
+        bytes memory message = abi.encode(block.chainid, address(this), pubkey, nonce);
+        if (!BLS12381.verifySignature(pubkey, message, signature)) {
             revert SignatureVerificationFailed();
+        }
 
         _remove(pkHash, idx, pubkey);
     }
@@ -91,7 +77,8 @@ contract OpenBuilderRegistry is IBuilderRegistry, BuilderListBase {
     }
 
     function _validateSignatureLength(bytes calldata signature) private pure {
-        if (signature.length != 192 && signature.length != 256)
+        if (signature.length != 192 && signature.length != 256) {
             revert InvalidSignatureLength(signature.length);
+        }
     }
 }

@@ -3,9 +3,7 @@ pragma solidity ^0.8.20;
 
 import {BuilderListBase} from "./BuilderListBase.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {
-    Ownable2Step
-} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
+import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
 /// @title PermissionedBuilderRegistry
 /// @notice Permissioned counterpart to `OpenBuilderRegistry` where the contract
@@ -21,11 +19,7 @@ contract PermissionedBuilderRegistry is Ownable2Step, BuilderListBase {
     /// @param pubkey 48-byte BLS12-381 compressed G1 pubkey.
     /// @param url Base URL of the builder's Builder-API.
     /// @param authData Expected `BuilderRequestAuth.data`; empty for the default.
-    function registerBuilder(
-        bytes calldata pubkey,
-        string calldata url,
-        bytes calldata authData
-    ) external onlyOwner {
+    function registerBuilder(bytes calldata pubkey, string calldata url, bytes calldata authData) external onlyOwner {
         _validatePubkey(pubkey);
         _validateEndpoint(url, authData);
         _upsert(keccak256(pubkey), pubkey, url, authData);
