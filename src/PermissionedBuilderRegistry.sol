@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {BuilderListBase} from "./BuilderListBase.sol";
+import {BLS12381} from "./lib/BLS12381.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 
@@ -9,7 +10,8 @@ import {Ownable2Step} from "openzeppelin-contracts/contracts/access/Ownable2Step
 /// @notice Permissioned counterpart to `OpenBuilderRegistry` where the contract
 /// owner curates a single builder list instead of builders self-registering
 /// with BLS signatures.
-/// @dev The owner's write does not prove that the builder controls `pubkey` or `url`;
+/// @dev Pubkeys are checked to be valid BLS12-381 G1 points (on curve, in subgroup,
+/// canonically encoded). The owner's write does not prove that the builder controls `pubkey` or `url`;
 /// clients must still perform the builder handshake before trusting an entry.
 /// Ownership transfers are two-step (`transferOwnership` + `acceptOwnership`).
 contract PermissionedBuilderRegistry is Ownable2Step, BuilderListBase {
@@ -21,6 +23,8 @@ contract PermissionedBuilderRegistry is Ownable2Step, BuilderListBase {
     /// @param authData Expected `BuilderRequestAuth.data`; empty for the default.
     function registerBuilder(bytes calldata pubkey, string calldata url, bytes calldata authData) external onlyOwner {
         _validatePubkey(pubkey);
+        // No signature proves the key here, so check it is a valid G1 point.
+        BLS12381.validatePubkey(pubkey);
         _validateEndpoint(url, authData);
         _upsert(keccak256(pubkey), pubkey, url, authData);
     }

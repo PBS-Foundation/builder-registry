@@ -6,6 +6,7 @@ import {BuilderRecord, IBuilderList} from "../src/interfaces/IERC8218.sol";
 import {BuilderListBase} from "../src/BuilderListBase.sol";
 import {PermissionedBuilderRegistry} from "../src/PermissionedBuilderRegistry.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
+import {BLS12381} from "../src/lib/BLS12381.sol";
 
 contract PermissionedBuilderRegistryTest is Test {
     PermissionedBuilderRegistry registry;
@@ -21,12 +22,10 @@ contract PermissionedBuilderRegistryTest is Test {
         vm.prank(owner);
         registry = new PermissionedBuilderRegistry();
 
-        pk1 = new bytes(48);
-        pk1[0] = 0x81;
-        pk2 = new bytes(48);
-        pk2[0] = 0x82;
-        pk3 = new bytes(48);
-        pk3[0] = 0x83;
+        // Valid BLS12-381 pubkeys generated with py_ecc.
+        pk1 = hex"97d7ff59198253b30a60fbc653cf89c9c45dda1161e62df522403001080ebb575b10f292b9ed9dfd39935eb23bca8f09";
+        pk2 = hex"ae1d4d7c851c3d73bc17066a32b33d69512db9d22175e2ca8e77f7b9b2db7dfad63aff1400c6ae0145daaa6dd8f7c229";
+        pk3 = hex"aaa9b36944e60dcf5c5036122c28eda5a621303b23d19bda5a68a25713e800bdfbb47341f1978656fd8ed9c546b08d51";
     }
 
     function testOwnerCanRegisterBuilder() public {
@@ -141,5 +140,65 @@ contract PermissionedBuilderRegistryTest is Test {
         vm.prank(outsider);
         registry.acceptOwnership();
         assertEq(registry.owner(), outsider);
+    }
+
+    // ---------------------------------------------------------------------
+    // Invalid BLS public keys (vectors generated with py_ecc)
+    // ---------------------------------------------------------------------
+
+    function _register(bytes memory pk) internal {
+        vm.prank(owner);
+        registry.registerBuilder(pk, "https://builder.example.com", "");
+    }
+
+    function testRevertPubkeyNotOnCurve() public {
+        // x = 1: x^3 + 4 is not a square mod p.
+        vm.expectRevert(BLS12381.NotOnCurve.selector);
+        _register(hex"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001");
+    }
+
+    function testRevertPubkeyNotInSubgroup() public {
+        // x = 4: on the curve, but not in the prime-order G1 subgroup.
+        vm.expectRevert(BLS12381.NotInSubgroup.selector);
+        _register(hex"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004");
+    }
+
+    function testRevertPubkeyXEqualsModulus() public {
+        vm.expectRevert(BLS12381.NonCanonicalFieldElement.selector);
+        _register(hex"9a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab");
+    }
+
+    /// @dev The same key encoded as x and as x + p must not produce two entries.
+    function testRevertNonCanonicalDuplicateOfValidKey() public {
+        bytes memory canonical =
+            hex"85a5756c9b93d6fcd2d2614b08ebe428c0b4c6101596ff7cd3a7fe75910193dbcfaf8c441fcd2627d02a65860c944443";
+        bytes memory nonCanonical =
+            hex"9fa68756d513bd971dee09014c379100252c1195091c123c3ad8d11687b289ffee5b8c42d12126278a2965860c93eeee";
+
+        _register(canonical);
+        assertTrue(registry.isBuilderRegistered(canonical));
+
+        vm.expectRevert(BLS12381.NonCanonicalFieldElement.selector);
+        _register(nonCanonical);
+        assertEq(registry.builderCount(), 1);
+    }
+
+    function testRevertPubkeyNotCompressed() public {
+        vm.expectRevert(BuilderListBase.InvalidPubkeyEncoding.selector);
+        _register(new bytes(48));
+    }
+
+    /// @dev An invalid point must not consume the caller's whole gas budget.
+    function testInvalidPubkeyGasIsBounded() public {
+        uint256 before = gasleft();
+        vm.prank(owner);
+        try registry.registerBuilder(
+            hex"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004",
+            "https://builder.example.com",
+            ""
+        ) {
+            fail();
+        } catch {}
+        assertLt(before - gasleft(), 200_000);
     }
 }
