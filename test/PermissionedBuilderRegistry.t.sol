@@ -163,6 +163,12 @@ contract PermissionedBuilderRegistryTest is Test {
         _register(hex"800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004");
     }
 
+    function testRevertWhenG1MSMPrecompileIsUnavailable() public {
+        vm.mockCall(address(0x0c), bytes(""), bytes(""));
+        vm.expectRevert(BLS12381.NotInSubgroup.selector);
+        _register(pk1);
+    }
+
     function testRevertPubkeyXEqualsModulus() public {
         vm.expectRevert(BLS12381.NonCanonicalFieldElement.selector);
         _register(hex"9a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab");

@@ -143,8 +143,8 @@ library BLS12381 {
 
         // MSM input: one (point, scalar) pair = 128-byte G1 point || 32-byte scalar 1.
         bytes memory input = abi.encodePacked(point, uint256(1));
-        (bool ok,) = G1MSM.staticcall{gas: G1MSM_SINGLE_GAS}(input);
-        if (!ok) revert NotInSubgroup();
+        (bool ok, bytes memory result) = G1MSM.staticcall{gas: G1MSM_SINGLE_GAS}(input);
+        if (!ok || result.length != 128) revert NotInSubgroup();
     }
 
     /// @notice Decompresses a 48-byte compressed G1 point to 128-byte uncompressed form.
