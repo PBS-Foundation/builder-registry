@@ -20,6 +20,12 @@ library BLS12381 {
     error NotCompressed();
     /// @dev The x-coordinate does not correspond to a point on BLS12-381 G1 (y² ≠ x³ + 4).
     error NotOnCurve();
+    /// @dev The x-coordinate is not a canonical field element (x ≥ p).
+    error NonCanonicalFieldElement();
+    /// @dev The public key is the point at infinity.
+    error InfinityPubkey();
+    /// @dev The point is not in the prime-order G1 subgroup.
+    error NotInSubgroup();
     /// @dev MODEXP precompile call failed.
     error ModexpFailed();
     /// @dev MAP_FP2_TO_G2 precompile call failed.
@@ -34,7 +40,13 @@ library BLS12381 {
     /// @dev EIP-2537 precompile addresses (Pectra):
     /// 0x0b G1ADD, 0x0c G1MSM, 0x0d G2ADD, 0x0e G2MSM,
     /// 0x0f PAIRING, 0x10 MAP_FP_TO_G1, 0x11 MAP_FP2_TO_G2
+    address private constant G1MSM = address(0x0c);
     address private constant G2ADD = address(0x0d);
+
+    /// @dev Gas forwarded to G1MSM for a single-point subgroup check. EIP-2537 charges
+    /// 12000 for k=1; a fixed cap keeps an invalid point (which consumes all forwarded
+    /// gas) from draining the caller's transaction.
+    uint256 private constant G1MSM_SINGLE_GAS = 20_000;
     address private constant PAIRING = address(0x0f);
     address private constant MAP_FP2_TO_G2 = address(0x11);
 
@@ -117,6 +129,24 @@ library BLS12381 {
         return abi.decode(result, (uint256)) == 1;
     }
 
+    /// @notice Validates a compressed G1 public key (IETF BLS `KeyValidate`): a canonical
+    /// encoding of a point on the curve, in the prime-order subgroup, not the identity.
+    /// @dev Reverts with the specific failure. Subgroup membership is checked by the G1MSM
+    /// precompile, which rejects points outside the subgroup (EIP-2537).
+    /// @param compressed 48-byte compressed G1 public key.
+    function validatePubkey(bytes calldata compressed) internal view {
+        if (compressed.length != 48) revert InvalidG1Length();
+        if (uint8(compressed[0]) & 0x40 != 0) revert InfinityPubkey();
+
+        // Reverts on missing compression flag, x ≥ p, or x not on the curve.
+        bytes memory point = g1Decompress(compressed);
+
+        // MSM input: one (point, scalar) pair = 128-byte G1 point || 32-byte scalar 1.
+        bytes memory input = abi.encodePacked(point, uint256(1));
+        (bool ok, bytes memory result) = G1MSM.staticcall{gas: G1MSM_SINGLE_GAS}(input);
+        if (!ok || result.length != 128) revert NotInSubgroup();
+    }
+
     /// @notice Decompresses a 48-byte compressed G1 point to 128-byte uncompressed form.
     /// @dev Implements Zcash compressed G1 deserialization:
     /// - Bit 7 of byte 0: compression flag (must be 1)
@@ -147,6 +177,9 @@ library BLS12381 {
         if (flagByte & 0x40 != 0) {
             return new bytes(128);
         }
+
+        // Reject non-canonical encodings (x ≥ p) so each point has exactly one encoding.
+        if (x_hi > P_HI || (x_hi == P_HI && x_lo >= P_LO)) revert NonCanonicalFieldElement();
 
         bool wantLargest = (flagByte & 0x20) != 0;
 
