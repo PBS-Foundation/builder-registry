@@ -2,8 +2,10 @@
 """Generate a real BLS12-381 signature for OpenBuilderRegistry tests.
 
 Usage:
-  bls_sign.py <chainid> <registry_address> <fqdn> <nonce_hex>       # register
-  bls_sign.py <chainid> <registry_address> --deregister <nonce_hex>  # deregister
+  bls_sign.py <chainid> <registry_address> --register <url> <auth_data_hex> <nonce>  # register
+  bls_sign.py <chainid> <registry_address> --deregister <nonce>                      # deregister
+
+`nonce` is a decimal uint64. `auth_data_hex` is 0x-prefixed hex ("0x" for empty).
 
 Outputs a single 0x-prefixed hex string (for Foundry vm.ffi):
   48-byte compressed G1 pubkey || 256-byte uncompressed G2 signature = 304 bytes
@@ -36,22 +38,26 @@ def g2_to_uncompressed(sig_compressed: bytes) -> bytes:
 def main():
     chainid = int(sys.argv[1])
     registry = sys.argv[2]  # hex address with 0x
+    mode = sys.argv[3]
 
-    if sys.argv[3] == "--deregister":
-        nonce = bytes.fromhex(sys.argv[4].replace("0x", ""))
-        # Deregister message: abi.encode(uint256, address, bytes, bytes32)
+    if mode == "--deregister":
+        nonce = int(sys.argv[4])
+        # Deregister message: abi.encode(uint256, address, bytes, uint64)
         message = eth_abi.encode(
-            ["uint256", "address", "bytes", "bytes32"],
+            ["uint256", "address", "bytes", "uint64"],
             [chainid, registry, PK, nonce],
         )
-    else:
-        fqdn = sys.argv[3]
-        nonce = bytes.fromhex(sys.argv[4].replace("0x", ""))
-        # Register message: abi.encode(uint256, address, bytes, string, bytes32)
+    elif mode == "--register":
+        url = sys.argv[4]
+        auth_data = bytes.fromhex(sys.argv[5].removeprefix("0x"))
+        nonce = int(sys.argv[6])
+        # Register message: abi.encode(uint256, address, bytes, string, bytes, uint64)
         message = eth_abi.encode(
-            ["uint256", "address", "bytes", "string", "bytes32"],
-            [chainid, registry, PK, fqdn, nonce],
+            ["uint256", "address", "bytes", "string", "bytes", "uint64"],
+            [chainid, registry, PK, url, auth_data, nonce],
         )
+    else:
+        sys.exit(f"unknown mode {mode}")
 
     sig_compressed = bls.Sign(SK, message)
     sig_uncompressed = g2_to_uncompressed(sig_compressed)

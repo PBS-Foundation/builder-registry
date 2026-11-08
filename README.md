@@ -11,8 +11,10 @@ EIP-7732 introduces staked builders at the Ethereum consensus layer, but clients
 
 ```solidity
 struct BuilderRecord {
-    bytes pubkey; // 48-byte compressed BLS12-381 public key
-    string fqdn;  // builder API endpoint name
+    bytes pubkey;     // 48-byte compressed BLS12-381 public key
+    string url;       // Builder-API base URL, e.g. https://builder.example.com:18550
+    bytes authData;   // expected BuilderRequestAuth.data; empty = hostname of url
+    uint64 updatedAt; // timestamp of the last update
 }
 ```
 
@@ -31,17 +33,17 @@ Both expose the same `IBuilderList` read interface. Each deployed contract repre
 
 [`src/OpenBuilderRegistry.sol`](src/OpenBuilderRegistry.sol) implements both `IBuilderRegistry` and `IBuilderList`.
 
-A builder registers or updates its FQDN by submitting:
+A builder registers or updates its record by submitting:
 
 - its 48-byte compressed BLS12-381 public key;
-- a non-empty FQDN of at most 253 bytes;
-- a public-key-scoped nonce; and
+- an `https://` URL of at most 512 bytes and optional `authData` of at most 4096 bytes;
+- a `uint64` nonce strictly greater than `nonces(pubkey)`; and
 - a valid BLS signature.
 
 The registration signature covers:
 
 ```solidity
-abi.encode(block.chainid, address(this), pubkey, fqdn, nonce)
+abi.encode(block.chainid, address(this), pubkey, url, authData, nonce)
 ```
 
 Deregistration uses a separate signed message:
@@ -50,7 +52,7 @@ Deregistration uses a separate signed message:
 abi.encode(block.chainid, address(this), pubkey, nonce)
 ```
 
-Including the chain ID and registry address prevents signatures from being replayed across chains or registry deployments. A successfully consumed nonce can only be used once for a given public key.
+Including the chain ID and registry address prevents signatures from being replayed across chains or registry deployments. Nonces must strictly increase per public key, which prevents replaying or reordering signed requests.
 
 Signature verification uses the EIP-2537 BLS12-381 precompiles and the `BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_` ciphersuite. The implementation accepts 192-byte Zcash-layout or 256-byte EIP-2537-layout uncompressed G2 signatures.
 
@@ -61,9 +63,9 @@ Signature verification uses the EIP-2537 BLS12-381 precompiles and the `BLS_SIG_
 The owner can:
 
 - register a builder;
-- update the FQDN associated with an existing public key;
+- update the URL and auth data associated with an existing public key;
 - deregister a builder; and
-- transfer ownership.
+- transfer ownership (two-step).
 
 The owner should be a suitably governed account, such as a multisig, when a permissioned registry is deployed for operational use. The admission policy itself is intentionally outside ERC-8218.
 
@@ -73,27 +75,27 @@ The owner should be a suitably governed account, such as a multisig, when a perm
 
 ```solidity
 interface IBuilderList {
-    function builderCount() external view returns (uint256);
+    event BuilderRegistered(bytes32 indexed pubkeyHash, bytes pubkey, string url, bytes authData);
+    event BuilderDeregistered(bytes32 indexed pubkeyHash, bytes pubkey);
 
-    function getBuilderAtIndex(uint256 index)
-        external
-        view
-        returns (BuilderRecord memory);
+    function builderCount() external view returns (uint256);
+    function getBuilderAtIndex(uint256 index) external view returns (BuilderRecord memory);
+    function getBuilders(uint256 offset, uint256 limit) external view returns (BuilderRecord[] memory);
+    function getBuilder(bytes calldata pubkey) external view returns (BuilderRecord memory);
+    function isBuilderRegistered(bytes calldata pubkey) external view returns (bool);
 }
 ```
 
-`IBuilderRegistry` additionally defines BLS-authorized registration and deregistration for permissionless implementations.
+`IBuilderRegistry` additionally defines BLS-authorized registration and deregistration, plus `nonces(pubkey)`, for permissionless implementations.
 
 ## Reading a registry
 
-Clients enumerate a registry using `builderCount()` and `getBuilderAtIndex(index)`:
+Clients enumerate a registry with `getBuilders(offset, limit)` and look up a single builder with `getBuilder(pubkey)`:
 
 ```solidity
-uint256 count = registry.builderCount();
-
-for (uint256 i; i < count; ++i) {
-    BuilderRecord memory builder = registry.getBuilderAtIndex(i);
-    // Cross-reference builder.pubkey against beacon state before use.
+BuilderRecord[] memory page = registry.getBuilders(0, 100);
+for (uint256 i; i < page.length; ++i) {
+    // Cross-reference page[i].pubkey against beacon state before use.
 }
 ```
 
@@ -109,7 +111,7 @@ Consumers must not treat registry inclusion as sufficient evidence that a builde
 4. perform the builder handshake when that protocol is specified; and
 5. apply any local reputation, availability, compliance, or allowlist policy.
 
-The contracts currently enforce only FQDN byte length and non-emptiness; they do not validate DNS syntax, endpoint reachability, TLS, or ownership of the resolved domain.
+The contracts enforce only basic URL format; they do not validate DNS syntax, endpoint reachability, TLS, or ownership of the resolved domain.
 
 ## Development
 
@@ -143,6 +145,7 @@ FFI is enabled in `foundry.toml` because the cryptographic tests call the Python
 
 ```text
 src/interfaces/IERC8218.sol         ERC-8218 data types and interfaces
+src/BuilderListBase.sol             Shared storage, validation and IBuilderList views
 src/OpenBuilderRegistry.sol         Permissionless BLS-authorized registry
 src/PermissionedBuilderRegistry.sol Owner-curated registry
 src/lib/BLS12381.sol                BLS verification and hash-to-curve logic
